@@ -56,7 +56,46 @@ export default function App() {
   );
   const [tempRoomCode, setTempRoomCode] = useState(roomCode);
   const [syncStatus, setSyncStatus] = useState('실시간 연동중');
+// 실시간 Gemini AI 분석 호출 로직
+const [aiReport, setAiReport] = useState('');
+const [isAiLoading, setIsAiLoading] = useState(false);
 
+const fetchAiReport = async () => {
+  const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
+  if (!apiKey) {
+    alert('Vercel 환경 변수에 VITE_GEMINI_API_KEY가 설정되지 않았습니다.');
+    return;
+  }
+  setIsAiLoading(true);
+  try {
+    const prompt = `
+우리 부부의 이번 달 가계부 현황입니다. 부부 재무 전문가로서 다정하고 위트 있게 실질적인 분석을 작성해 주세요:
+- 총수입: ${monthlyStats.totalIncome.toLocaleString()}원
+- 총지출: ${monthlyStats.totalExpense.toLocaleString()}원
+- 저축률: ${savingsRate.toFixed(1)}%
+- 총 대출잔액: ${totalDebt.toLocaleString()}원
+
+[작성 양식]
+1. 이번 달 소비/식비 비중 평가
+2. 저축률 및 목표 달성 진단
+3. 다음 달 즉시 실천 가능한 절약 팁 2가지
+    `;
+    const res = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] }),
+      }
+    );
+    const data = await res.json();
+    setAiReport(data.candidates?.[0]?.content?.parts?.[0]?.text || '리포트를 생성하지 못했습니다.');
+  } catch (e) {
+    alert('AI 리포트 생성 중 오류가 발생했습니다.');
+  } finally {
+    setIsAiLoading(false);
+  }
+};
   // --- 기본 데이터 상태 ---
   const [transactions, setTransactions] = useState([
     {
@@ -1053,19 +1092,32 @@ export default function App() {
               </div>
 
               {/* AI 소비 분석 코멘트 */}
-              <div className="bg-[#ebf5f2] p-3.5 rounded-xl border border-[#166553]/20 flex flex-col gap-1">
-                <span className="text-xs font-black text-[#166553] flex items-center gap-1">
-                  <Sparkles size={14} /> AI 부부 소비 심층 분석 코멘트
-                </span>
-                <p className="text-xs text-gray-700 leading-relaxed font-medium">
-                  현재 <b>{categoryBreakdown[0]?.cat || '식비'}</b> 비중이 전체
-                  지출의 <b>{categoryBreakdown[0]?.pct || 0}%</b>로 가장
-                  높습니다. 하지만 부부 합산 저축률이{' '}
-                  <b>{savingsRate.toFixed(1)}%</b>로 매우 우수하며, 현 추세를
-                  유지하면 목표 순자산({(targetAsset / 100000000).toFixed(1)}억
-                  원)에 약 <b>{monthsToTarget}개월</b> 뒤 도달할 것으로
-                  예측됩니다.
-                </p>
+{/* AI 소비 분석 코멘트 (Gemini 실시간 연동) */}
+<div className="bg-[#ebf5f2] p-3.5 rounded-xl border border-[#166553]/20 flex flex-col gap-2">
+                <div className="flex justify-between items-center">
+                  <span className="text-xs font-black text-[#166553] flex items-center gap-1">
+                    <Sparkles size={14} /> AI 부부 소비 심층 분석 코멘트
+                  </span>
+                  <button
+                    onClick={fetchAiReport}
+                    disabled={isAiLoading}
+                    className="px-2.5 py-1 bg-[#166553] text-white rounded-lg text-[11px] font-bold hover:bg-[#124d3f] transition disabled:opacity-50"
+                  >
+                    {isAiLoading ? '분석 중...' : '실시간 AI 분석'}
+                  </button>
+                </div>
+                {aiReport ? (
+                  <div className="text-xs text-gray-800 leading-relaxed font-medium whitespace-pre-line bg-white/80 p-3 rounded-lg border border-[#166553]/10">
+                    {aiReport}
+                  </div>
+                ) : (
+                  <p className="text-xs text-gray-700 leading-relaxed font-medium">
+                    현재 <b>{categoryBreakdown[0]?.cat || '식비'}</b> 비중이 전체
+                    지출의 <b>{categoryBreakdown[0]?.pct || 0}%</b>로 가장
+                    높습니다. 위 <b>[실시간 AI 분석]</b> 버튼을 누르면 Gemini가
+                    가계부 데이터를 바탕으로 맞춤 분석 리포트를 작성합니다.
+                  </p>
+                )}
               </div>
             </div>
           </div>
