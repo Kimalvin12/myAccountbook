@@ -58,7 +58,7 @@ export default function App() {
   const [syncStatus, setSyncStatus] = useState('실시간 연동중');
 
   // 실시간 Gemini AI 분석 호출 로직
-  const [aiReport, setAiReport] = useState('');
+  const [aiReport, setAiReport] = useState(() => localStorage.getItem('lastAiReport') || '');
   const [isAiLoading, setIsAiLoading] = useState(false);
 
   const fetchAiReport = async () => {
@@ -96,7 +96,9 @@ export default function App() {
       if (!res.ok) {
         throw new Error(data.error?.message || `HTTP ${res.status}`);
       }
-      setAiReport(data.candidates?.[0]?.content?.parts?.[0]?.text || '리포트를 생성하지 못했습니다.');
+      const reportText = data.candidates?.[0]?.content?.parts?.[0]?.text || '리포트를 생성하지 못했습니다.';
+      setAiReport(reportText);
+      localStorage.setItem('lastAiReport', reportText);
     } catch (e: any) {
       console.error('Gemini API Error:', e);
       alert(`[AI 오류 상세] ${e.message || e}`);
