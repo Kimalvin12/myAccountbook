@@ -69,20 +69,43 @@ export default function App() {
     }
     setIsAiLoading(true);
     try {
-      const topCats = categoryBreakdown.slice(0, 3).map(c => `${c.cat}: ${c.amt.toLocaleString()}원(${c.pct}%)`).join(', ');
+// 1. 지출 상위 3개 항목
+const topCats = categoryBreakdown.slice(0, 3).map(c => `${c.cat}: ${c.amt.toLocaleString()}원(${c.pct}%)`).join(', ');
 
-      const prompt = `우리 부부의 실제 이번 달(${currentYear}년 ${currentMonth}월, ${ownerFilter} 기준) 가계부 데이터를 바탕으로 재무 진단을 해주세요.
-없는 내용을 지어내지 말고, 아래 제공된 실제 수치만을 바탕으로 명쾌하게 분석해야 합니다.
+// 2. 총자산 및 비중 계산
+const totalGrossAsset = totalCash + totalRealEstate + totalStockEval;
+const cashRatio = totalGrossAsset > 0 ? ((totalCash / totalGrossAsset) * 100).toFixed(1) : '0';
+const stockRatio = totalGrossAsset > 0 ? ((totalStockEval / totalGrossAsset) * 100).toFixed(1) : '0';
+const reRatio = totalGrossAsset > 0 ? ((totalRealEstate / totalGrossAsset) * 100).toFixed(1) : '0';
+const debtRatio = netWorth > 0 ? ((totalLoanAmt / netWorth) * 100).toFixed(1) : '0';
 
-[실제 가계부 데이터]
-- 총 수입: ${reportIncome.toLocaleString()}원
-- 총 지출: ${reportExpense.toLocaleString()}원 (월 예산: ${monthlyBudget.toLocaleString()}원)
-- 순저축액: ${(reportIncome - reportExpense).toLocaleString()}원 (저축률: ${savingsRate.toFixed(1)}%)
-- 지출 상위 항목: ${topCats || '내역 없음'}
+// 3. 보유 주식/ETF 종목 정리
+const stockListStr = filteredStocks.map(s => `${s.name}(보유 ${s.shares}주, 현재가 ${s.currentPrice.toLocaleString()}원)`).join(', ');
 
-[요청 사항]
-1. 위 실제 수치를 직접 언급하며 이번 달 소비와 저축 밸런스 평가
-2. 지출 비중이 가장 큰 항목을 집중 분석하고 현실적인 절약 조언 2가지`;
+// 4. 자산관리 전문 PB 프롬프트
+const prompt = `당신은 10년 차 공인 자산관리 전문가(PB)이자 현실적인 부부 재무 어드바이저입니다.
+두루뭉술한 조언은 배제하고, 반드시 아래 제공된 [실제 부부 자산 및 가계 데이터 수치]를 직접 인용하며 명쾌하고 날카로운 종합 재무 진단 리포트를 작성해 주세요.
+
+[실제 부부 자산 및 가계 데이터]
+■ 순자산 포트폴리오 현황 (${ownerFilter} 기준)
+- 총 순자산: ${netWorth.toLocaleString()}원 (목표: ${(targetAsset / 100000000).toFixed(1)}억원 중 ${targetAchievementRate.toFixed(1)}% 달성)
+- 총 대출(부채): ${totalLoanAmt.toLocaleString()}원 (순자산 대비 부채 비율: ${debtRatio}%)
+- 자산군별 비중:
+* 예·적금/현금: ${totalCash.toLocaleString()}원 (${cashRatio}%)
+* 주식/ETF 투자자산: ${totalStockEval.toLocaleString()}원 (${stockRatio}%) [투자 손익: ${totalStockProfit >= 0 ? '+' : ''}${totalStockProfit.toLocaleString()}원, 수익률: ${totalStockRate.toFixed(2)}%]
+* 부동산/보증금: ${totalRealEstate.toLocaleString()}원 (${reRatio}%)
+- 보유 주요 종목: ${stockListStr || '보유 종목 없음'}
+- 목표 도달 전망: 월 저축 페이스(${monthlySavingEst.toLocaleString()}원) 유지 시 목표 달성까지 약 ${monthsToTarget}개월 소요 예상
+
+■ 이번 달 소비 현금흐름 (${currentYear}년 ${currentMonth}월)
+- 총 수입: ${reportIncome.toLocaleString()}원 / 총 지출: ${reportExpense.toLocaleString()}원 (월 예산: ${monthlyBudget.toLocaleString()}원)
+- 잉여 자금(순저축): ${(reportIncome - reportExpense).toLocaleString()}원 (이번 달 저축률: ${savingsRate.toFixed(1)}%)
+- 주요 지출 Top: ${topCats || '내역 없음'}
+
+[리포트 작성 양식 - 가독성 높은 마크다운 소제목 활용]
+1. ⚖️ 포트폴리오 비중 & 부채 리스크 진단 (대출 비율, 현금 vs 투자 비중의 적정성 및 투자 성과 평가)
+2. 🎯 순자산 ${(targetAsset / 100000000).toFixed(1)}억 달성 로드맵 (현재 예상 소요 기간 ${monthsToTarget}개월을 단축하기 위한 자산 배분/투자 조언)
+3. 🧭 이번 달 현금흐름 & 자금 배분 전략 (단순 생활비 아끼기가 아닌, 부부의 이번 달 잉여 저축금을 어디로 먼저 보낼지 우선순위 제시)`;
 
       const res = await fetch(
         `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent?key=${apiKey}`,
