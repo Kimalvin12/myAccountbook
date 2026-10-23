@@ -56,19 +56,20 @@ export default function App() {
   );
   const [tempRoomCode, setTempRoomCode] = useState(roomCode);
   const [syncStatus, setSyncStatus] = useState('실시간 연동중');
-// 실시간 Gemini AI 분석 호출 로직
-const [aiReport, setAiReport] = useState('');
-const [isAiLoading, setIsAiLoading] = useState(false);
 
-const fetchAiReport = async () => {
-  const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
-  if (!apiKey) {
-    alert('Vercel 환경 변수에 VITE_GEMINI_API_KEY가 설정되지 않았습니다.');
-    return;
-  }
-  setIsAiLoading(true);
-  try {
-    const prompt = `우리 부부의 이번 달 가계부 현황을 진단해 주세요.
+  // 실시간 Gemini AI 분석 호출 로직
+  const [aiReport, setAiReport] = useState('');
+  const [isAiLoading, setIsAiLoading] = useState(false);
+
+  const fetchAiReport = async () => {
+    const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
+    if (!apiKey) {
+      alert('Vercel 환경 변수에 VITE_GEMINI_API_KEY가 설정되지 않았습니다.');
+      return;
+    }
+    setIsAiLoading(true);
+    try {
+      const prompt = `우리 부부의 이번 달 가계부 현황을 진단해 주세요.
 전문적이고 위트 있는 부부 자산관리 전문가로서 현실적이고 명쾌한 재무 리포트를 작성해 주세요:
 
 [작성 양식]
@@ -76,26 +77,27 @@ const fetchAiReport = async () => {
 2. 맞벌이/부부 저축률 극대화 및 순자산 달성을 위한 핵심 조언
 3. 다음 달 즉시 실천 가능한 생활비 절약 팁 2가지`;
 
-    const res = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent?key=${apiKey}`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] }),
+      const res = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent?key=${apiKey}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] }),
+        }
+      );
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error?.message || `HTTP ${res.status}`);
       }
-    );
-    const data = await res.json();
-    if (!res.ok) {
-      throw new Error(data.error?.message || `HTTP ${res.status}`);
+      setAiReport(data.candidates?.[0]?.content?.parts?.[0]?.text || '리포트를 생성하지 못했습니다.');
+    } catch (e: any) {
+      console.error('Gemini API Error:', e);
+      alert(`[AI 오류 상세] ${e.message || e}`);
+    } finally {
+      setIsAiLoading(false);
     }
-    setAiReport(data.candidates?.[0]?.content?.parts?.[0]?.text || '리포트를 생성하지 못했습니다.');
-  } catch (e: any) {
-    console.error('Gemini API Error:', e);
-    alert(`[AI 오류 상세] ${e.message || e}`);
-  } finally {
-    setIsAiLoading(false);
-  }
-};
+  };
+
   // --- 기본 데이터 상태 ---
   const [transactions, setTransactions] = useState([
     {
@@ -1091,9 +1093,8 @@ const fetchAiReport = async () => {
                 ))}
               </div>
 
-              {/* AI 소비 분석 코멘트 */}
-{/* AI 소비 분석 코멘트 (Gemini 실시간 연동) */}
-<div className="bg-[#ebf5f2] p-3.5 rounded-xl border border-[#166553]/20 flex flex-col gap-2">
+              {/* AI 소비 분석 코멘트 (Gemini 실시간 연동) */}
+              <div className="bg-[#ebf5f2] p-3.5 rounded-xl border border-[#166553]/20 flex flex-col gap-2">
                 <div className="flex justify-between items-center">
                   <span className="text-xs font-black text-[#166553] flex items-center gap-1">
                     <Sparkles size={14} /> AI 부부 소비 심층 분석 코멘트
