@@ -69,13 +69,20 @@ export default function App() {
     }
     setIsAiLoading(true);
     try {
-      const prompt = `우리 부부의 이번 달 가계부 현황을 진단해 주세요.
-전문적이고 위트 있는 부부 자산관리 전문가로서 현실적이고 명쾌한 재무 리포트를 작성해 주세요:
+      const topCats = categoryBreakdown.slice(0, 3).map(c => `${c.cat}: ${c.amt.toLocaleString()}원(${c.pct}%)`).join(', ');
 
-[작성 양식]
-1. 이번 달 부부 소비 및 식비/고정비 지출 밸런스 평가
-2. 맞벌이/부부 저축률 극대화 및 순자산 달성을 위한 핵심 조언
-3. 다음 달 즉시 실천 가능한 생활비 절약 팁 2가지`;
+      const prompt = `우리 부부의 실제 이번 달(${currentYear}년 ${currentMonth}월, ${ownerFilter} 기준) 가계부 데이터를 바탕으로 재무 진단을 해주세요.
+없는 내용을 지어내지 말고, 아래 제공된 실제 수치만을 바탕으로 명쾌하게 분석해야 합니다.
+
+[실제 가계부 데이터]
+- 총 수입: ${reportIncome.toLocaleString()}원
+- 총 지출: ${reportExpense.toLocaleString()}원 (월 예산: ${monthlyBudget.toLocaleString()}원)
+- 순저축액: ${(reportIncome - reportExpense).toLocaleString()}원 (저축률: ${savingsRate.toFixed(1)}%)
+- 지출 상위 항목: ${topCats || '내역 없음'}
+
+[요청 사항]
+1. 위 실제 수치를 직접 언급하며 이번 달 소비와 저축 밸런스 평가
+2. 지출 비중이 가장 큰 항목을 집중 분석하고 현실적인 절약 조언 2가지`;
 
       const res = await fetch(
         `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent?key=${apiKey}`,
