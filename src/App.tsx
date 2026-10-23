@@ -69,16 +69,14 @@ const fetchAiReport = async () => {
   setIsAiLoading(true);
   try {
     const prompt = `
-우리 부부의 이번 달 가계부 현황입니다. 부부 재무 전문가로서 다정하고 위트 있게 실질적인 분석을 작성해 주세요:
-- 총수입: ${monthlyStats.totalIncome.toLocaleString()}원
-- 총지출: ${monthlyStats.totalExpense.toLocaleString()}원
-- 저축률: ${savingsRate.toFixed(1)}%
-- 총 대출잔액: ${totalDebt.toLocaleString()}원
-
-[작성 양식]
-1. 이번 달 소비/식비 비중 평가
-2. 저축률 및 목표 달성 진단
-3. 다음 달 즉시 실천 가능한 절약 팁 2가지
+    우리 부부의 이번 달 가계부 현황을 진단해 주세요.
+    전문적이고 위트 있는 부부 자산관리 전문가로서 현실적이고 명쾌한 재무 리포트를 작성해 주세요:
+    
+    [작성 양식]
+    1. 이번 달 부부 소비 및 식비/고정비 지출 밸런스 평가
+    2. 맞벌이/부부 저축률 극대화 및 순자산 달성을 위한 핵심 조언
+    3. 다음 달 즉시 실천 가능한 생활비 절약 팁 2가지
+          `;
     `;
     const res = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
