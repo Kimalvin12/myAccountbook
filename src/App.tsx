@@ -81,7 +81,7 @@ const fetchAiReport = async () => {
 3. 다음 달 즉시 실천 가능한 절약 팁 2가지
     `;
     const res = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -89,10 +89,15 @@ const fetchAiReport = async () => {
       }
     );
     const data = await res.json();
+    if (!res.ok) {
+      throw new Error(data.error?.message || `HTTP ${res.status}`);
+    }
     setAiReport(data.candidates?.[0]?.content?.parts?.[0]?.text || '리포트를 생성하지 못했습니다.');
-  } catch (e) {
-    alert('AI 리포트 생성 중 오류가 발생했습니다.');
+  } catch (e: any) {
+    console.error('Gemini API Error:', e);
+    alert(`[AI 오류 상세] ${e.message || e}`);
   } finally {
+
     setIsAiLoading(false);
   }
 };
