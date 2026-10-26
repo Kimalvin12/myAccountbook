@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   Calendar as CalendarIcon,
   PieChart,
@@ -384,7 +384,7 @@ export default function App() {
     {
       id: 3,
       name: 'KODEX 미국나스닥100TR',
-      code: '379800',
+      code: '379810',
       shares: 250,
       avgPrice: 15200,
       currentPrice: 23400,
@@ -561,15 +561,65 @@ export default function App() {
     }
   };
 
-  // --- 2) 주식·ETF 실시간 시세 연동 로직 (네이버 증권 API 프록시 + Gemini 검색 백업) ---
+  // --- 2) 주식·ETF 실시간 시세 연동 로직 (자체 서버 API 0.2초 직결 + 네이버 실시간 폴링) ---
+  const KNOWN_STOCK_CODES = {
+    '삼성전자': '005930',
+    '삼전': '005930',
+    '삼성전자우': '005935',
+    'sk하이닉스': '000660',
+    '하이닉스': '000660',
+    '현대차': '005380',
+    '현대자동차': '005380',
+    '기아': '000270',
+    'naver': '035420',
+    '네이버': '035420',
+    '카카오': '035720',
+    'lg에너지솔루션': '373220',
+    '삼성바이오로직스': '207940',
+    '셀트리온': '068270',
+    '포스코홀딩스': '005490',
+    'kb금융': '105560',
+    '신한지주': '055550',
+    '하나금융지주': '086790',
+    '한화에어로스페이스': '012450',
+    '두산에너빌리티': '034020',
+    'tiger미국s&p500': '360750',
+    '타이거미국s&p500': '360750',
+    'kodex미국s&p500tr': '379800',
+    'kodex미국s&p500': '379800',
+    '코덱스미국s&p500': '379800',
+    'kodex미국나스닥100tr': '379810',
+    'kodex미국나스닥100': '379810',
+    '코덱스미국나스닥100': '379810',
+    'tiger미국나스닥100': '133690',
+    '타이거미국나스닥100': '133690',
+    'ace미국s&p500': '360200',
+    'ace미국나스닥100': '367380',
+    'tiger미국배당다우존스': '458730',
+    '타이거미국배당다우존스': '458730',
+    'sol미국배당다우존스': '446720',
+    'kodex미국배당다우존스': '489250',
+    'tiger미국필라델피아반도체나스닥': '381180',
+    'tiger미국테크top10indxx': '381170',
+    'kodex200': '069500',
+    'tiger200': '102110',
+  };
+
+  const normalizeStockName = (s) =>
+    String(s || '')
+      .toLowerCase()
+      .replace(/[\s_\-.,()]/g, '');
+
   const fetchJsonWithProxy = async (targetUrl) => {
+    const bustUrl =
+      targetUrl + (targetUrl.includes('?') ? '&' : '?') + '_t=' + Date.now();
     const proxies = [
-      (u) => `https://api.allorigins.win/raw?url=${encodeURIComponent(u)}`,
       (u) => `https://corsproxy.io/?${encodeURIComponent(u)}`,
+      (u) => `https://api.allorigins.win/raw?url=${encodeURIComponent(u)}`,
     ];
     for (const makeUrl of proxies) {
       try {
-        const res = await fetch(makeUrl(targetUrl));
+        const res = await fetch(makeUrl(bustUrl), { cache: 'no-store' });
         if (res.ok) {
           const text = await res.text();
           return JSON.parse(text);
@@ -581,45 +631,15 @@ export default function App() {
     throw new Error('프록시 응답 실패');
   };
 
-  // 자주 쓰는 대표 종목/ETF 코드 내장 사전 (프록시 검색 지연 방지)
-  const KNOWN_STOCK_CODES = {
-    '삼성전자': '005930',
-    '삼성전자우': '005935',
-    'sk하이닉스': '000660',
-    '현대차': '005380',
-    '기아': '000270',
-    'naver': '035420',
-    '네이버': '035420',
-    '카카오': '035720',
-    'tiger미국s&p500': '360750',
-    'kodex미국s&p500tr': '379800',
-    'kodex미국s&p500': '379800',
-    'kodex미국나스닥100tr': '379810',
-    'kodex미국나스닥100': '379810',
-    'tiger미국나스닥100': '133690',
-    'ace미국s&p500': '360200',
-    'ace미국나스닥100': '367380',
-    'tiger미국배당다우존스': '458730',
-    'sol미국배당다우존스': '446720',
-    'kodex200': '069500',
-  };
+  const fetchSingleStockPriceFallback = async (stock) => {
+    const normName = normalizeStockName(stock.name);
+    let code = KNOWN_STOCK_CODES[normName] || '';
 
-  const fetchSingleStockPrice = async (stock) => {
-    let code =
-      stock.code && /^[0-9A-Z]{6}$/i.test(String(stock.code).trim())
-        ? String(stock.code).trim()
-        : '';
-
-    const normalizedName = (stock.name || '').toLowerCase().replace(/\s+/g, '');
-    if (!code && KNOWN_STOCK_CODES[normalizedName]) {
-      code = KNOWN_STOCK_CODES[normalizedName];
-    }
-
-    // 종목코드가 없으면 네이버 증권 자동완성 API로 종목코드 조회
     if (!code && stock.name) {
       try {
+        const q = stock.name.replace(/TR$/i, '').trim();
         const searchUrl = `https://ac.stock.naver.com/ac?q=${encodeURIComponent(
-          stock.name.trim()
+          q
         )}&target=stock,etf,index`;
         const searchData = await fetchJsonWithProxy(searchUrl);
         const firstItem = searchData?.items?.[0];
@@ -631,12 +651,23 @@ export default function App() {
       }
     }
 
-    // 종목코드로 네이버 모바일 증권 실시간 현재가 조회
+    if (
+      !code &&
+      stock.code &&
+      /^[0-9A-Z]{6}$/i.test(String(stock.code).trim())
+    ) {
+      code = String(stock.code).trim().toUpperCase();
+    }
+
     if (code) {
       try {
         const basicUrl = `https://m.stock.naver.com/api/stock/${code}/basic`;
         const basicData = await fetchJsonWithProxy(basicUrl);
-        const rawPrice = basicData?.closePrice || basicData?.nowVal;
+        const rawPrice =
+          basicData?.overMarketPriceInfo?.overMarketStatus === 'OPEN' &&
+          basicData?.overMarketPriceInfo?.overPrice
+            ? basicData.overMarketPriceInfo.overPrice
+            : basicData?.closePrice || basicData?.nowVal;
         if (rawPrice) {
           const parsed = Number(String(rawPrice).replace(/,/g, ''));
           if (!isNaN(parsed) && parsed > 0) {
@@ -650,55 +681,64 @@ export default function App() {
     return null;
   };
 
-  const syncRealTimeStockPrices = async (silent = false) => {
-    if (!stocks || stocks.length === 0) return;
+  const syncRealTimeStockPrices = async (silent = false, customStocks = null) => {
+    const targetList = customStocks || stocks;
+    if (!targetList || targetList.length === 0) return;
     setIsStockSyncing(true);
     try {
       let updatedCount = 0;
+      let serverResults = null;
+
+      // 1순위: 자체 Vercel 서버 API (/api/stock)로 0.2초 만에 전 종목 실시간 조회
+      try {
+        const res = await fetch('/api/stock', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            stocks: targetList.map((s) => ({
+              id: s.id,
+              name: s.name,
+              code: s.code,
+            })),
+          }),
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if (data?.ok && data?.results) {
+            serverResults = data.results;
+          }
+        }
+      } catch (e) {
+        console.warn('서버 API 호출 실패, 브라우저 직접 조회로 전환:', e);
+      }
+
+      const failedNames = [];
       const updatedStocks = await Promise.all(
-        stocks.map(async (st) => {
-          const result = await fetchSingleStockPrice(st);
-          if (result && result.price > 0) {
+        targetList.map(async (st) => {
+          const fromServer = serverResults?.[st.id];
+          if (fromServer && fromServer.price > 0) {
             updatedCount++;
             return {
               ...st,
-              currentPrice: result.price,
-              code: result.code || st.code || '-',
+              currentPrice: fromServer.price,
+              code: fromServer.code || st.code || '-',
             };
           }
+
+          const fallback = await fetchSingleStockPriceFallback(st);
+          if (fallback && fallback.price > 0) {
+            updatedCount++;
+            return {
+              ...st,
+              currentPrice: fallback.price,
+              code: fallback.code || st.code || '-',
+            };
+          }
+
+          failedNames.push(st.name);
           return st;
         })
       );
-
-      // 만약 프록시로 못 가져온 종목이 있고 Gemini API 키가 있다면 실시간 검색으로 백업 조회
-      if (updatedCount < stocks.length && import.meta.env.VITE_GEMINI_API_KEY) {
-        try {
-          const names = stocks.map((s) => s.name).join(', ');
-          const text = await callGeminiText(
-            `다음 주식/ETF 종목들의 가장 최근 한국 원화(KRW) 기준 1주당 현재가(숫자만)를 JSON 객체로만 답해줘. 마크다운 없이 순수 JSON만 출력해. 예시: {"삼성전자": 58000}\n종목 목록: ${names}`,
-            true
-          );
-          const jsonMatch = text.match(/\{[\s\S]*\}/);
-          if (jsonMatch) {
-            const priceMap = JSON.parse(jsonMatch[0]);
-            for (let i = 0; i < updatedStocks.length; i++) {
-              const stName = updatedStocks[i].name;
-              const priceVal = Number(
-                String(priceMap[stName] || '').replace(/,/g, '')
-              );
-              if (!isNaN(priceVal) && priceVal > 0) {
-                updatedStocks[i] = {
-                  ...updatedStocks[i],
-                  currentPrice: priceVal,
-                };
-                updatedCount++;
-              }
-            }
-          }
-        } catch (e) {
-          console.warn('Gemini 시세 백업 조회 실패:', e);
-        }
-      }
 
       setStocks(updatedStocks);
       syncToCloud({ stocks: updatedStocks });
@@ -706,14 +746,22 @@ export default function App() {
       setLastStockSyncTime(
         `${String(now.getHours()).padStart(2, '0')}:${String(
           now.getMinutes()
-        ).padStart(2, '0')} 기준`
+        ).padStart(2, '0')} 실시간`
       );
       if (!silent) {
-        if (updatedCount > 0) {
-          alert(`총 ${updatedCount}개 종목의 실시간 현재가가 업데이트되었습니다!`);
+        if (updatedCount === targetList.length) {
+          alert(
+            `전 종목(${updatedCount}개) 네이버 실시간 현재가가 즉시 반영되었습니다!`
+          );
+        } else if (updatedCount > 0) {
+          alert(
+            `${updatedCount}개 종목 반영 완료!\n(미반영 종목: ${failedNames.join(
+              ', '
+            )} - 종목명이나 6자리 종목코드를 확인해주세요)`
+          );
         } else {
           alert(
-            '시세를 자동으로 불러오지 못했습니다. 종목명이나 6자리 종목코드(예: 005930)를 확인해 주세요.'
+            '시세를 불러오지 못했습니다. 종목명이나 6자리 종목코드(예: 000660)를 확인해 주세요.'
           );
         }
       }
@@ -724,7 +772,6 @@ export default function App() {
       setIsStockSyncing(false);
     }
   };
-
   // --- 4) 카드 결제 문자/카톡 스마트 파싱 (규칙 파서 + Gemini AI 업종 추론 결합) ---
   const parseRawSmsBlocks = (rawText) => {
     const blocks = rawText
@@ -1291,10 +1338,16 @@ ${bulkSmsText.trim()}
     const form = new FormData(e.target);
     const nameStr = String(form.get('name') || '').trim();
     const inputCode = String(form.get('code') || '').trim();
+    const normName = normalizeStockName(nameStr);
+    const nameChanged =
+      stockModal.item &&
+      normalizeStockName(stockModal.item.name) !== normName;
+    const codeUnchangedFromOld =
+      stockModal.item && inputCode === String(stockModal.item.code || '');
+
     const autoCode =
-      inputCode ||
-      KNOWN_STOCK_CODES[nameStr.toLowerCase().replace(/\s+/g, '')] ||
-      stockModal.item?.code ||
+      KNOWN_STOCK_CODES[normName] ||
+      (!nameChanged || !codeUnchangedFromOld ? inputCode : '') ||
       '-';
 
     const item = {
@@ -1312,6 +1365,7 @@ ${bulkSmsText.trim()}
     setStocks(updated);
     syncToCloud({ stocks: updated });
     setStockModal({ open: false, item: null });
+    setTimeout(() => syncRealTimeStockPrices(true, updated), 100);
   };
 
   const deleteStock = (id) => {
