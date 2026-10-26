@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+﻿import React, { useState, useEffect, useMemo } from 'react';
 import {
   Calendar as CalendarIcon,
   PieChart,
@@ -22,6 +22,8 @@ import {
   Sparkles,
   Share2,
   Download,
+  MessageSquarePlus,
+  BarChart2,
 } from 'lucide-react';
 
 // --- Firebase SDK 임포트 및 초기화 ---
@@ -41,15 +43,144 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
-// 한국 공휴일 (2026년 10월 예시)
+// 한국 공휴일 예시
 const HOLIDAYS = {
+  '2026-01-01': '신정',
+  '2026-03-01': '삼일절',
+  '2026-05-05': '어린이날',
+  '2026-06-06': '현충일',
+  '2026-08-15': '광복절',
   '2026-10-03': '개천절',
   '2026-10-05': '대체공휴일',
   '2026-10-09': '한글날',
+  '2026-12-25': '성탄절',
 };
 
+// 카테고리별 색상 팔레트 (원형 도넛 그래프 및 범례용)
+const CATEGORY_COLORS = {
+  '식비': '#166553',
+  '외식/카페': '#10b981',
+  '교통/차량': '#3b82f6',
+  '주거/통신': '#6366f1',
+  '쇼핑/생활': '#f59e0b',
+  '문화/여가': '#ec4899',
+  '의료/건강': '#14b8a6',
+  '경조사/선물': '#8b5cf6',
+  '용돈/기타': '#64748b',
+  '급여': '#059669',
+  '부수입': '#34d399',
+};
+
+const EXPENSE_CATEGORIES = [
+  '식비',
+  '외식/카페',
+  '교통/차량',
+  '주거/통신',
+  '쇼핑/생활',
+  '문화/여가',
+  '의료/건강',
+  '경조사/선물',
+  '용돈/기타',
+];
+
+const ALL_CATEGORIES = [...EXPENSE_CATEGORIES, '급여', '부수입'];
+
+// 한국 가맹점명 스마트 카테고리 분류기 (AI 백업 및 즉시 분류용)
+function classifyKoreanMerchant(storeName) {
+  const s = (storeName || '').toLowerCase().replace(/\s+/g, '');
+
+  // 1) 주거/통신/공과금
+  if (
+    /lgu|유플러스|skt|에스케이텔레콤|kt|케이티|알뜰폰|통신|인터넷|관리비|아파트아이|도시가스|삼천리|서울가스|한국전력|한전|수도|보험|화재|생명|해상/.test(
+      s
+    )
+  ) {
+    return '주거/통신';
+  }
+
+  // 2) 교통/차량/주유
+  if (
+    /주유|칼텍스|sk에너지|에쓰오일|s-oil|오일뱅크|충전소|택시|카카오t|kakaot|우티|티머니|코레일|철도|srt|고속버스|시외버스|하이패스|도로공사|주차|파킹|쏘카|그린카|카센터|정비|오토큐|블루핸즈|세차/.test(
+      s
+    )
+  ) {
+    return '교통/차량';
+  }
+
+  // 3) 의료/건강
+  if (
+    /약국|병원|의원|치과|한의원|내과|외과|소아과|이비인후과|피부과|안과|정형외과|산부인과|비뇨기과|마취|통증|클리닉|메디컬|건강검진|헬스|피트니스|필라테스|요가/.test(
+      s
+    )
+  ) {
+    return '의료/건강';
+  }
+
+  // 4) 식비 (마트/장보기/편의점/정육/청과)
+  if (
+    /이마트|트레이더스|홈플러스|롯데마트|하나로마트|농협|식자재|마트|슈퍼|익스프레스|노브랜드|코스트코|컬리|마켓컬리|오아시스|편의점|gs25|지에스25|cu|씨유|세븐일레븐|이마트24|정육|식육|축산|수산|청과|과일|야채|채소|반찬|떡집|방앗간|쌀/.test(
+      s
+    )
+  ) {
+    return '식비';
+  }
+
+  // 5) 외식/카페 (식당/음식점/배달/카페/베이커리 업종 단어 대폭 포함)
+  if (
+    /스타벅스|투썸|메가커피|메가엠지씨|컴포즈|빽다방|이디야|폴바셋|할리스|파스쿠찌|블루보틀|커피|카페|cafe|라떼|티하우스|공차|쥬시|베이커리|파리바게뜨|뚜레쥬르|성심당|제과|빵|도넛|던킨|배달의민족|배민|우아한형제들|요기요|쿠팡이츠|식당|음식|한식|중식|일식|양식|분식|회관|식탁|밥상|키친|다이닝|비스트로|갈비|삼겹|구이|정식|백반|국밥|순대|설렁탕|곰탕|해장국|감자탕|부대찌개|김치찌개|된장|청국장|불고기|보쌈|족발|곱창|막창|양꼬치|마라|훠궈|샤브|초밥|스시|오마카세|회센타|횟집|참치|일식|돈까스|돈카츠|우동|소바|라멘|짜장|짬뽕|탕수육|반점|중화|치킨|통닭|교촌|bhc|bbq|굽네|푸라닭|피자|도미노|버거|맥도날드|버거킹|롯데리아|맘스터치|노브랜드버거|써브웨이|샌드위치|샐러드|김밥|떡볶이|엽기떡볶이|신전|청년다방|칼국수|수제비|냉면|막국수|콩나물|아구찜|해물|조개|장어|오리|닭갈비|찜닭|술집|포차|호프|맥주|비어|이자카야|바\(bar\)|펍/.test(
+      s
+    )
+  ) {
+    return '외식/카페';
+  }
+
+  // 6) 쇼핑/생활
+  if (
+    /쿠팡|coupang|네이버페이|네이버파이낸셜|카카오페이|11번가|지마켓|옥션|ssg|무신사|29cm|에이블리|지그재그|올리브영|다이소|모던하우스|이케아|오늘의집|백화점|아울렛|현대백화점|신세계|롯데백화점|유니클로|자라|h&m|탑텐|나이키|아디다스|뉴발란스|세탁|크린토피아|미용실|헤어|네일|바버샵|문구|알파|교보문고|영풍문고|예스24|알라딘/.test(
+      s
+    )
+  ) {
+    return '쇼핑/생활';
+  }
+
+  // 7) 문화/여가
+  if (
+    /cgv|메가박스|롯데시네마|영화|넷플릭스|유튜브|티빙|웨이브|디즈니|쿠팡플레이|멜론|스포티파이|넥슨|엔씨|넷마블|스팀|steam|닌텐도|플레이스테이션|게임|pc방|노래방|볼링|당구|골프|스크린|야구|축구|티켓|인터파크|여행|야놀자|여기어때|아고다|에어비앤비|호텔|리조트|펜션|항공|대한항공|아시아나|진에어|제주항공|티웨이/.test(
+      s
+    )
+  ) {
+    return '문화/여가';
+  }
+
+  // 8) 경조사/선물
+  if (/꽃집|플라워|화원|선물|축의|부의|경조사|카카오선물/.test(s)) {
+    return '경조사/선물';
+  }
+
+  return '용돈/기타';
+}
+
 export default function App() {
-  const [activeTab, setActiveTab] = useState('calendar');
+  // --- 오늘 날짜 자동 계산 헬퍼 ---
+  const todayInfo = useMemo(() => {
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = now.getMonth() + 1;
+    const day = now.getDate();
+    const dateStr = `${year}-${String(month).padStart(2, '0')}-${String(
+      day
+    ).padStart(2, '0')}`;
+    return { year, month, dateStr };
+  }, []);
+
+  // --- 1) 새로고침해도 유지되는 탭 상태 (localStorage 연동) ---
+  const [activeTab, setActiveTab] = useState(
+    () => localStorage.getItem('activeTab') || 'calendar'
+  );
+  useEffect(() => {
+    localStorage.setItem('activeTab', activeTab);
+  }, [activeTab]);
+
   const [ownerFilter, setOwnerFilter] = useState('전체');
   const [roomCode, setRoomCode] = useState(
     () => localStorage.getItem('roomCode') || 'sweet-home-2026'
@@ -57,76 +188,27 @@ export default function App() {
   const [tempRoomCode, setTempRoomCode] = useState(roomCode);
   const [syncStatus, setSyncStatus] = useState('실시간 연동중');
 
-  // 실시간 Gemini AI 분석 호출 로직
-  const [aiReport, setAiReport] = useState(() => localStorage.getItem('lastAiReport') || '');
-  const [isAiLoading, setIsAiLoading] = useState(false);
+  // --- 날짜 상태 (항상 오늘 날짜로 초기화되어 10/15 고정 문제 해결) ---
+  const [currentYear, setCurrentYear] = useState(todayInfo.year);
+  const [currentMonth, setCurrentMonth] = useState(todayInfo.month);
+  const [selectedDate, setSelectedDate] = useState(todayInfo.dateStr);
 
-  const fetchAiReport = async () => {
-    const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
-    if (!apiKey) {
-      alert('Vercel 환경 변수에 VITE_GEMINI_API_KEY가 설정되지 않았습니다.');
-      return;
+  // 이전 달 / 다음 달 이동 핸들러 (연도 자동 변경 포함)
+  const handlePrevMonth = () => {
+    if (currentMonth === 1) {
+      setCurrentYear((y) => y - 1);
+      setCurrentMonth(12);
+    } else {
+      setCurrentMonth((m) => m - 1);
     }
-    setIsAiLoading(true);
-    try {
-// 1. 지출 상위 3개 항목
-const topCats = categoryBreakdown.slice(0, 3).map(c => `${c.cat}: ${c.amt.toLocaleString()}원(${c.pct}%)`).join(', ');
+  };
 
-// 2. 총자산 및 비중 계산
-const totalGrossAsset = totalCash + totalRealEstate + totalStockEval;
-const cashRatio = totalGrossAsset > 0 ? ((totalCash / totalGrossAsset) * 100).toFixed(1) : '0';
-const stockRatio = totalGrossAsset > 0 ? ((totalStockEval / totalGrossAsset) * 100).toFixed(1) : '0';
-const reRatio = totalGrossAsset > 0 ? ((totalRealEstate / totalGrossAsset) * 100).toFixed(1) : '0';
-const debtRatio = netWorth > 0 ? ((totalLoanAmt / netWorth) * 100).toFixed(1) : '0';
-
-// 3. 보유 주식/ETF 종목 정리
-const stockListStr = filteredStocks.map(s => `${s.name}(보유 ${s.shares}주, 현재가 ${s.currentPrice.toLocaleString()}원)`).join(', ');
-
-// 4. 자산관리 전문 PB 프롬프트
-const prompt = `당신은 10년 차 공인 자산관리 전문가(PB)이자 현실적인 부부 재무 어드바이저입니다.
-두루뭉술한 조언은 배제하고, 반드시 아래 제공된 [실제 부부 자산 및 가계 데이터 수치]를 직접 인용하며 명쾌하고 날카로운 종합 재무 진단 리포트를 작성해 주세요.
-
-[실제 부부 자산 및 가계 데이터]
-■ 순자산 포트폴리오 현황 (${ownerFilter} 기준)
-- 총 순자산: ${netWorth.toLocaleString()}원 (목표: ${(targetAsset / 100000000).toFixed(1)}억원 중 ${targetAchievementRate.toFixed(1)}% 달성)
-- 총 대출(부채): ${totalLoanAmt.toLocaleString()}원 (순자산 대비 부채 비율: ${debtRatio}%)
-- 자산군별 비중:
-* 예·적금/현금: ${totalCash.toLocaleString()}원 (${cashRatio}%)
-* 주식/ETF 투자자산: ${totalStockEval.toLocaleString()}원 (${stockRatio}%) [투자 손익: ${totalStockProfit >= 0 ? '+' : ''}${totalStockProfit.toLocaleString()}원, 수익률: ${totalStockRate.toFixed(2)}%]
-* 부동산/보증금: ${totalRealEstate.toLocaleString()}원 (${reRatio}%)
-- 보유 주요 종목: ${stockListStr || '보유 종목 없음'}
-- 목표 도달 전망: 월 저축 페이스(${monthlySavingEst.toLocaleString()}원) 유지 시 목표 달성까지 약 ${monthsToTarget}개월 소요 예상
-
-■ 이번 달 소비 현금흐름 (${currentYear}년 ${currentMonth}월)
-- 총 수입: ${reportIncome.toLocaleString()}원 / 총 지출: ${reportExpense.toLocaleString()}원 (월 예산: ${monthlyBudget.toLocaleString()}원)
-- 잉여 자금(순저축): ${(reportIncome - reportExpense).toLocaleString()}원 (이번 달 저축률: ${savingsRate.toFixed(1)}%)
-- 주요 지출 Top: ${topCats || '내역 없음'}
-
-[리포트 작성 양식 - 가독성 높은 마크다운 소제목 활용]
-1. ⚖️ 포트폴리오 비중 & 부채 리스크 진단 (대출 비율, 현금 vs 투자 비중의 적정성 및 투자 성과 평가)
-2. 🎯 순자산 ${(targetAsset / 100000000).toFixed(1)}억 달성 로드맵 (현재 예상 소요 기간 ${monthsToTarget}개월을 단축하기 위한 자산 배분/투자 조언)
-3. 🧭 이번 달 현금흐름 & 자금 배분 전략 (단순 생활비 아끼기가 아닌, 부부의 이번 달 잉여 저축금을 어디로 먼저 보낼지 우선순위 제시)`;
-
-      const res = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent?key=${apiKey}`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] }),
-        }
-      );
-      const data = await res.json();
-      if (!res.ok) {
-        throw new Error(data.error?.message || `HTTP ${res.status}`);
-      }
-      const reportText = data.candidates?.[0]?.content?.parts?.[0]?.text || '리포트를 생성하지 못했습니다.';
-      setAiReport(reportText);
-      localStorage.setItem('lastAiReport', reportText);
-    } catch (e: any) {
-      console.error('Gemini API Error:', e);
-      alert(`[AI 오류 상세] ${e.message || e}`);
-    } finally {
-      setIsAiLoading(false);
+  const handleNextMonth = () => {
+    if (currentMonth === 12) {
+      setCurrentYear((y) => y + 1);
+      setCurrentMonth(1);
+    } else {
+      setCurrentMonth((m) => m + 1);
     }
   };
 
@@ -314,16 +396,11 @@ const prompt = `당신은 10년 차 공인 자산관리 전문가(PB)이자 현�
   const [monthlyBudget, setMonthlyBudget] = useState(2500000);
   const [includeSpecial, setIncludeSpecial] = useState(true);
 
-  // --- 날짜 상태 ---
-  const [currentYear, setCurrentYear] = useState(2026);
-  const [currentMonth, setCurrentMonth] = useState(10);
-  const [selectedDate, setSelectedDate] = useState('2026-10-15');
-
-  // --- 모달 상태 (영수증, 통장, 대출, 부동산, 주식, 일괄시세, 평단계산기) ---
+  // --- 모달 상태 ---
   const [isTxModalOpen, setIsTxModalOpen] = useState(false);
   const [editingTx, setEditingTx] = useState(null);
   const [txForm, setTxForm] = useState({
-    date: '2026-10-15',
+    date: todayInfo.dateStr,
     type: '지출',
     category: '식비',
     amount: '',
@@ -332,11 +409,23 @@ const prompt = `당신은 10년 차 공인 자산관리 전문가(PB)이자 현�
     isSpecial: false,
   });
 
+  // 카드 결제 문자/카톡 스마트 분석 상태
+  const [smsText, setSmsText] = useState('');
+  const [isSmsParsing, setIsSmsParsing] = useState(false);
+  const [isBulkSmsModalOpen, setIsBulkSmsModalOpen] = useState(false);
+  const [bulkSmsText, setBulkSmsText] = useState('');
+  const [parsedBulkItems, setParsedBulkItems] = useState([]);
+  const [isBulkSmsLoading, setIsBulkSmsLoading] = useState(false);
+
   const [accountModal, setAccountModal] = useState({ open: false, item: null });
   const [loanModal, setLoanModal] = useState({ open: false, item: null });
   const [reModal, setReModal] = useState({ open: false, item: null });
   const [stockModal, setStockModal] = useState({ open: false, item: null });
   const [bulkPriceModal, setBulkPriceModal] = useState(false);
+
+  // 주식 실시간 시세 연동 상태
+  const [isStockSyncing, setIsStockSyncing] = useState(false);
+  const [lastStockSyncTime, setLastStockSyncTime] = useState('');
 
   // 평단가 물타기/불타기 계산기 상태
   const [calcStockId, setCalcStockId] = useState(1);
@@ -397,6 +486,517 @@ const prompt = `당신은 10년 차 공인 자산관리 전문가(PB)이자 현�
     } catch (e) {
       console.error('Cloud sync error:', e);
     }
+  };
+
+  // --- Gemini API 공통 호출 헬퍼 (모델 자동 폴백 지원) ---
+  const callGeminiText = async (promptText, useSearch = false) => {
+    const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
+    if (!apiKey) {
+      throw new Error('VITE_GEMINI_API_KEY 미설정');
+    }
+    const models = ['gemini-3.5-flash-lite', 'gemini-3.8-flash', 'gemini-2.5-flash'];
+    let lastErr = null;
+    for (const modelName of models) {
+      try {
+        const bodyObj = {
+          contents: [{ parts: [{ text: promptText }] }],
+        };
+        if (useSearch) {
+          bodyObj.tools = [{ google_search: {} }];
+        }
+        const res = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(bodyObj),
+          }
+        );
+        const data = await res.json();
+        if (res.ok && data.candidates?.[0]?.content?.parts?.[0]?.text) {
+          return data.candidates[0].content.parts[0].text;
+        }
+        lastErr = new Error(data.error?.message || `HTTP ${res.status}`);
+      } catch (err) {
+        lastErr = err;
+      }
+    }
+    throw lastErr || new Error('Gemini 응답 실패');
+  };
+
+  // --- 실시간 Gemini AI 분석 리포트 호출 ---
+  const [aiReport, setAiReport] = useState(() => localStorage.getItem('lastAiReport') || '');
+  const [isAiLoading, setIsAiLoading] = useState(false);
+
+  const fetchAiReport = async () => {
+    const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
+    if (!apiKey) {
+      alert('Vercel 환경 변수에 VITE_GEMINI_API_KEY가 설정되지 않았습니다.');
+      return;
+    }
+    setIsAiLoading(true);
+    try {
+      const catSummary = categoryBreakdown
+        .map((c) => `${c.cat}: ${c.amt.toLocaleString()}원(${c.pct}%)`)
+        .join(', ');
+      const prompt = `우리 부부의 ${currentYear}년 ${currentMonth}월 가계부 현황을 진단해 주세요.
+- 이번 달 총수입: ${reportIncome.toLocaleString()}원
+- 이번 달 총지출: ${reportExpense.toLocaleString()}원 (목표 예산: ${monthlyBudget.toLocaleString()}원)
+- 저축률: ${savingsRate.toFixed(1)}%
+- 카테고리별 지출: ${catSummary || '내역 없음'}
+
+전문적이고 위트 있는 부부 자산관리 전문가로서 현실적이고 명쾌한 재무 리포트를 작성해 주세요:
+1. 이번 달 부부 소비 및 식비/고정비 지출 밸런스 평가
+2. 맞벌이/부부 저축률 극대화 및 순자산 달성을 위한 핵심 조언
+3. 다음 달 즉시 실천 가능한 생활비 절약 팁 2가지`;
+
+      const text = await callGeminiText(prompt, false);
+      setAiReport(text);
+      localStorage.setItem('lastAiReport', text);
+    } catch (e) {
+      console.error('Gemini API Error:', e);
+      alert(`[AI 오류 상세] ${e.message || e}`);
+    } finally {
+      setIsAiLoading(false);
+    }
+  };
+
+  // --- 2) 주식·ETF 실시간 시세 연동 로직 (네이버 증권 API 프록시 + Gemini 검색 백업) ---
+  const fetchJsonWithProxy = async (targetUrl) => {
+    const proxies = [
+      (u) => `https://api.allorigins.win/raw?url=${encodeURIComponent(u)}`,
+      (u) => `https://corsproxy.io/?${encodeURIComponent(u)}`,
+    ];
+    for (const makeUrl of proxies) {
+      try {
+        const res = await fetch(makeUrl(targetUrl));
+        if (res.ok) {
+          const text = await res.text();
+          return JSON.parse(text);
+        }
+      } catch (e) {
+        // 다음 프록시로 재시도
+      }
+    }
+    throw new Error('프록시 응답 실패');
+  };
+
+  // 자주 쓰는 대표 종목/ETF 코드 내장 사전 (프록시 검색 지연 방지)
+  const KNOWN_STOCK_CODES = {
+    '삼성전자': '005930',
+    '삼성전자우': '005935',
+    'sk하이닉스': '000660',
+    '현대차': '005380',
+    '기아': '000270',
+    'naver': '035420',
+    '네이버': '035420',
+    '카카오': '035720',
+    'tiger미국s&p500': '360750',
+    'kodex미국s&p500tr': '379800',
+    'kodex미국s&p500': '379800',
+    'kodex미국나스닥100tr': '379810',
+    'kodex미국나스닥100': '379810',
+    'tiger미국나스닥100': '133690',
+    'ace미국s&p500': '360200',
+    'ace미국나스닥100': '367380',
+    'tiger미국배당다우존스': '458730',
+    'sol미국배당다우존스': '446720',
+    'kodex200': '069500',
+  };
+
+  const fetchSingleStockPrice = async (stock) => {
+    let code =
+      stock.code && /^[0-9A-Z]{6}$/i.test(String(stock.code).trim())
+        ? String(stock.code).trim()
+        : '';
+
+    const normalizedName = (stock.name || '').toLowerCase().replace(/\s+/g, '');
+    if (!code && KNOWN_STOCK_CODES[normalizedName]) {
+      code = KNOWN_STOCK_CODES[normalizedName];
+    }
+
+    // 종목코드가 없으면 네이버 증권 자동완성 API로 종목코드 조회
+    if (!code && stock.name) {
+      try {
+        const searchUrl = `https://ac.stock.naver.com/ac?q=${encodeURIComponent(
+          stock.name.trim()
+        )}&target=stock,etf,index`;
+        const searchData = await fetchJsonWithProxy(searchUrl);
+        const firstItem = searchData?.items?.[0];
+        if (firstItem?.code) {
+          code = firstItem.code;
+        }
+      } catch (e) {
+        console.warn('종목코드 자동검색 실패:', stock.name);
+      }
+    }
+
+    // 종목코드로 네이버 모바일 증권 실시간 현재가 조회
+    if (code) {
+      try {
+        const basicUrl = `https://m.stock.naver.com/api/stock/${code}/basic`;
+        const basicData = await fetchJsonWithProxy(basicUrl);
+        const rawPrice = basicData?.closePrice || basicData?.nowVal;
+        if (rawPrice) {
+          const parsed = Number(String(rawPrice).replace(/,/g, ''));
+          if (!isNaN(parsed) && parsed > 0) {
+            return { price: parsed, code };
+          }
+        }
+      } catch (e) {
+        console.warn('네이버 실시간 현재가 조회 실패:', code);
+      }
+    }
+    return null;
+  };
+
+  const syncRealTimeStockPrices = async (silent = false) => {
+    if (!stocks || stocks.length === 0) return;
+    setIsStockSyncing(true);
+    try {
+      let updatedCount = 0;
+      const updatedStocks = await Promise.all(
+        stocks.map(async (st) => {
+          const result = await fetchSingleStockPrice(st);
+          if (result && result.price > 0) {
+            updatedCount++;
+            return {
+              ...st,
+              currentPrice: result.price,
+              code: result.code || st.code || '-',
+            };
+          }
+          return st;
+        })
+      );
+
+      // 만약 프록시로 못 가져온 종목이 있고 Gemini API 키가 있다면 실시간 검색으로 백업 조회
+      if (updatedCount < stocks.length && import.meta.env.VITE_GEMINI_API_KEY) {
+        try {
+          const names = stocks.map((s) => s.name).join(', ');
+          const text = await callGeminiText(
+            `다음 주식/ETF 종목들의 가장 최근 한국 원화(KRW) 기준 1주당 현재가(숫자만)를 JSON 객체로만 답해줘. 마크다운 없이 순수 JSON만 출력해. 예시: {"삼성전자": 58000}\n종목 목록: ${names}`,
+            true
+          );
+          const jsonMatch = text.match(/\{[\s\S]*\}/);
+          if (jsonMatch) {
+            const priceMap = JSON.parse(jsonMatch[0]);
+            for (let i = 0; i < updatedStocks.length; i++) {
+              const stName = updatedStocks[i].name;
+              const priceVal = Number(
+                String(priceMap[stName] || '').replace(/,/g, '')
+              );
+              if (!isNaN(priceVal) && priceVal > 0) {
+                updatedStocks[i] = {
+                  ...updatedStocks[i],
+                  currentPrice: priceVal,
+                };
+                updatedCount++;
+              }
+            }
+          }
+        } catch (e) {
+          console.warn('Gemini 시세 백업 조회 실패:', e);
+        }
+      }
+
+      setStocks(updatedStocks);
+      syncToCloud({ stocks: updatedStocks });
+      const now = new Date();
+      setLastStockSyncTime(
+        `${String(now.getHours()).padStart(2, '0')}:${String(
+          now.getMinutes()
+        ).padStart(2, '0')} 기준`
+      );
+      if (!silent) {
+        if (updatedCount > 0) {
+          alert(`총 ${updatedCount}개 종목의 실시간 현재가가 업데이트되었습니다!`);
+        } else {
+          alert(
+            '시세를 자동으로 불러오지 못했습니다. 종목명이나 6자리 종목코드(예: 005930)를 확인해 주세요.'
+          );
+        }
+      }
+    } catch (e) {
+      console.error('실시간 시세 연동 오류:', e);
+      if (!silent) alert('실시간 시세 연동 중 오류가 발생했습니다.');
+    } finally {
+      setIsStockSyncing(false);
+    }
+  };
+
+  // --- 4) 카드 결제 문자/카톡 스마트 파싱 (규칙 파서 + Gemini AI 업종 추론 결합) ---
+  const parseRawSmsBlocks = (rawText) => {
+    const blocks = rawText
+      .split(/\n\s*\n/)
+      .map((b) => b.trim())
+      .filter(Boolean);
+
+    return blocks.map((block) => {
+      // 1) 금액 추출 ("누적" 금액은 제외하고 결제 승인금액 우선 추출)
+      const lines = block
+        .split('\n')
+        .map((l) => l.trim())
+        .filter(Boolean);
+      let amount = 0;
+      for (const line of lines) {
+        if (line.includes('누적') || line.includes('잔액')) continue;
+        const m = line.match(/([\d,]+)\s*원/);
+        if (m) {
+          const val = parseInt(m[1].replace(/,/g, ''), 10);
+          if (val > 0) {
+            amount = val;
+            break;
+          }
+        }
+      }
+      if (amount === 0) {
+        const fallbackMatch = block.match(/([\d,]+)\s*원/);
+        if (fallbackMatch) {
+          amount = parseInt(fallbackMatch[1].replace(/,/g, ''), 10);
+        }
+      }
+
+      // 2) 날짜 추출 (MM/DD 또는 YYYY-MM-DD 또는 MM월 DD일)
+      let parsedDate = selectedDate || todayInfo.dateStr;
+      const ymdMatch = block.match(/(20\d{2})[-./](\d{1,2})[-./](\d{1,2})/);
+      const mdMatch = block.match(/(\d{1,2})[/.](\d{1,2})/);
+      const krMdMatch = block.match(/(\d{1,2})월\s*(\d{1,2})일/);
+      if (ymdMatch) {
+        parsedDate = `${ymdMatch[1]}-${String(ymdMatch[2]).padStart(
+          2,
+          '0'
+        )}-${String(ymdMatch[3]).padStart(2, '0')}`;
+      } else if (mdMatch) {
+        const m = Number(mdMatch[1]);
+        const d = Number(mdMatch[2]);
+        if (m >= 1 && m <= 12 && d >= 1 && d <= 31) {
+          parsedDate = `${currentYear}-${String(m).padStart(2, '0')}-${String(
+            d
+          ).padStart(2, '0')}`;
+        }
+      } else if (krMdMatch) {
+        const m = Number(krMdMatch[1]);
+        const d = Number(krMdMatch[2]);
+        if (m >= 1 && m <= 12 && d >= 1 && d <= 31) {
+          parsedDate = `${currentYear}-${String(m).padStart(2, '0')}-${String(
+            d
+          ).padStart(2, '0')}`;
+        }
+      }
+
+      // 3) 사용처(가맹점명) 추출
+      let store = '';
+      const labeledMatch = block.match(
+        /(?:가맹점명|사용처|이용가맹점|가맹점)\s*[:：]\s*([^\n]+)/
+      );
+      if (labeledMatch) {
+        store = labeledMatch[1].trim();
+      } else {
+        for (const line of lines) {
+          if (
+            line.includes('Web발신') ||
+            line.includes('누적') ||
+            line.includes('승인금액') ||
+            line.includes('승인일시') ||
+            /^\[.*카드.*\]$/.test(line)
+          ) {
+            continue;
+          }
+          // 날짜+시간 뒤에 가맹점이 같이 적힌 줄 (예: "10/22 10:58 (주)넥슨코리아" 또는 "10/22 19:52 송도갈비")
+          const dateTimeLineMatch = line.match(
+            /\d{1,2}[/.]\d{1,2}\s+\d{1,2}:\d{2}\s+(.+)/
+          );
+          if (dateTimeLineMatch) {
+            store = dateTimeLineMatch[1].trim();
+            break;
+          }
+        }
+        // 여전히 못 찾았으면 금액/카드사/날짜 줄이 아닌 마지막 의미있는 줄 선택
+        if (!store) {
+          const candidateLines = lines.filter(
+            (l) =>
+              !l.includes('Web발신') &&
+              !l.includes('누적') &&
+              !l.includes('일시불') &&
+              !l.includes('할부') &&
+              !l.includes('승인') &&
+              !/^[\d,]+원/.test(l)
+          );
+          if (candidateLines.length > 0) {
+            store = candidateLines[candidateLines.length - 1]
+              .replace(/^[-*•]\s*/, '')
+              .trim();
+          }
+        }
+      }
+
+      // 만약 한 줄짜리 간편 입력 (예: "LGU+ 25000원 결제" 또는 "할머니순대국 18000원")인 경우
+      if (!store || store === block) {
+        store = block
+          .replace(/\[Web발신\]/gi, '')
+          .replace(/[\d,]+원/g, '')
+          .replace(/\d{1,2}[/.]\d{1,2}(\s+\d{1,2}:\d{2})?/g, '')
+          .replace(/(일시불|할부|승인|결제|결재)/g, '')
+          .trim();
+      }
+
+      const category = classifyKoreanMerchant(store || block);
+      return {
+        date: parsedDate,
+        type: '지출',
+        category,
+        amount: amount || '',
+        owner: ownerFilter === '전체' ? '공동' : ownerFilter,
+        memo: store || '카드 결제',
+      };
+    });
+  };
+
+  // 단건 문자 붙여넣기 분석 (내역 입력 모달 내)
+  const handleAnalyzeSingleSms = async () => {
+    if (!smsText.trim()) return;
+    setIsSmsParsing(true);
+    try {
+      // 1차: 내장 스마트 파서로 즉시 추출
+      const [firstParsed] = parseRawSmsBlocks(smsText);
+      let finalData = { ...firstParsed };
+
+      // 2차: Gemini API 키가 있으면 애매한 식당/상점 이름까지 AI가 정확히 카테고리 분류
+      if (import.meta.env.VITE_GEMINI_API_KEY) {
+        try {
+          const prompt = `다음 한국 카드 결제 문자(또는 지출 메모)를 분석해서 JSON 객체로만 답해줘.
+허용 카테고리 목록: ${EXPENSE_CATEGORIES.join(', ')}
+- 식당, 밥집, 고깃집, 분식, 치킨, 배달, 카페, 빵집 등은 반드시 "외식/카페"로 분류할 것.
+- 마트, 편의점, 식자재, 정육점, 반찬가게 등은 "식비"로 분류할 것.
+- 통신사(LGU+, KT, SKT), 관리비, 가스, 전기, 보험은 "주거/통신"으로 분류할 것.
+- 주유소, 택시, 기차, 버스, 주차, 하이패스는 "교통/차량"으로 분류할 것.
+- 약국, 병원, 의원, 치과, 한의원은 "의료/건강"으로 분류할 것.
+
+입력 문자:
+"""
+${smsText.trim()}
+"""
+
+출력 형식 (순수 JSON만 출력):
+{"date": "YYYY-MM-DD (연도가 없으면 ${currentYear}년 기준, 날짜가 아예 없으면 ${
+            selectedDate || todayInfo.dateStr
+          })", "amount": 숫자만, "memo": "가맹점명/사용처 깔끔하게", "category": "위 허용 카테고리 중 정확히 하나"}`;
+
+          const aiResText = await callGeminiText(prompt, false);
+          const jsonMatch = aiResText.match(/\{[\s\S]*\}/);
+          if (jsonMatch) {
+            const aiParsed = JSON.parse(jsonMatch[0]);
+            if (aiParsed.amount) finalData.amount = Number(aiParsed.amount);
+            if (aiParsed.memo) finalData.memo = aiParsed.memo;
+            if (
+              aiParsed.category &&
+              EXPENSE_CATEGORIES.includes(aiParsed.category)
+            ) {
+              finalData.category = aiParsed.category;
+            }
+            if (
+              aiParsed.date &&
+              /^\d{4}-\d{2}-\d{2}$/.test(String(aiParsed.date))
+            ) {
+              finalData.date = aiParsed.date;
+            }
+          }
+        } catch (e) {
+          console.warn('AI 문자 상세 분류 폴백(내장 사전 사용):', e);
+        }
+      }
+
+      setTxForm((prev) => ({
+        ...prev,
+        date: finalData.date || prev.date,
+        type: '지출',
+        category: finalData.category || '식비',
+        amount: finalData.amount ? String(finalData.amount) : prev.amount,
+        memo: finalData.memo || prev.memo,
+      }));
+    } finally {
+      setIsSmsParsing(false);
+    }
+  };
+
+  // 여러 건의 카드 문자 일괄 분석 핸들러
+  const handleAnalyzeBulkSms = async () => {
+    if (!bulkSmsText.trim()) return;
+    setIsBulkSmsLoading(true);
+    try {
+      let items = parseRawSmsBlocks(bulkSmsText);
+
+      // Gemini API가 설정되어 있으면 전체 가맹점 카테고리를 한 번에 정밀 보정
+      if (import.meta.env.VITE_GEMINI_API_KEY && items.length > 0) {
+        try {
+          const prompt = `다음 카드 결제 문자 내역들을 분석해서 JSON 배열로만 답해줘.
+허용 카테고리: ${EXPENSE_CATEGORIES.join(', ')}
+- 동네 식당, 음식점, 술집, 카페, 치킨, 배달 등은 모두 "외식/카페"로 분류해.
+- LGU+, SKT, KT, 관리비, 도시가스, 보험 등은 "주거/통신"으로 분류해.
+- 마트, 편의점, 식자재는 "식비"로 분류해.
+- 주유, 택시, 대중교통, 주차는 "교통/차량"으로 분류해.
+
+입력 텍스트:
+"""
+${bulkSmsText.trim()}
+"""
+
+출력 JSON 배열 형식:
+[{"date": "YYYY-MM-DD (연도 없으면 ${currentYear}년)", "amount": 숫자, "memo": "가맹점명", "category": "허용 카테고리 중 하나"}]`;
+
+          const aiText = await callGeminiText(prompt, false);
+          const arrMatch = aiText.match(/\[[\s\S]*\]/);
+          if (arrMatch) {
+            const aiArr = JSON.parse(arrMatch[0]);
+            if (Array.isArray(aiArr) && aiArr.length > 0) {
+              items = aiArr.map((it) => ({
+                date:
+                  it.date && /^\d{4}-\d{2}-\d{2}$/.test(it.date)
+                    ? it.date
+                    : selectedDate || todayInfo.dateStr,
+                type: '지출',
+                category: EXPENSE_CATEGORIES.includes(it.category)
+                  ? it.category
+                  : classifyKoreanMerchant(it.memo),
+                amount: Number(String(it.amount || 0).replace(/,/g, '')),
+                owner: ownerFilter === '전체' ? '공동' : ownerFilter,
+                memo: it.memo || '카드 결제',
+                isSpecial: false,
+              }));
+            }
+          }
+        } catch (e) {
+          console.warn('일괄 문자 AI 보정 실패, 내장 파서 결과 사용:', e);
+        }
+      }
+
+      setParsedBulkItems(items.filter((i) => Number(i.amount) > 0));
+    } finally {
+      setIsBulkSmsLoading(false);
+    }
+  };
+
+  const handleSaveBulkSmsItems = () => {
+    if (parsedBulkItems.length === 0) return;
+    const now = Date.now();
+    const newTxs = parsedBulkItems.map((item, idx) => ({
+      id: now + idx,
+      date: item.date,
+      type: '지출',
+      category: item.category,
+      amount: Number(item.amount),
+      owner: item.owner || '공동',
+      memo: item.memo,
+      isSpecial: false,
+    }));
+    const updated = [...newTxs, ...transactions];
+    setTransactions(updated);
+    syncToCloud({ transactions: updated });
+    setIsBulkSmsModalOpen(false);
+    setBulkSmsText('');
+    setParsedBulkItems([]);
+    alert(`총 ${newTxs.length}건의 카드 결제 내역이 가계부에 등록되었습니다!`);
   };
 
   // --- 명의 필터링 헬퍼 ---
@@ -464,7 +1064,48 @@ const prompt = `당신은 10년 차 공인 자산관리 전문가(PB)이자 현�
     Math.round((reportExpense / monthlyBudget) * 100)
   );
 
-  // 카테고리별 분석
+  // --- 추천 1) 실제 전월 대비 증감률 계산 & 최근 6개월 월별 소비 추이 데이터 ---
+  const sixMonthTrend = useMemo(() => {
+    const result = [];
+    for (let offset = 5; offset >= 0; offset--) {
+      const d = new Date(currentYear, currentMonth - 1 - offset, 1);
+      const y = d.getFullYear();
+      const m = d.getMonth() + 1;
+      const prefix = `${y}-${String(m).padStart(2, '0')}`;
+      const txs = transactions.filter(
+        (t) =>
+          t.date.startsWith(prefix) &&
+          matchOwner(t.owner) &&
+          (includeSpecial ? true : !t.isSpecial)
+      );
+      const inc = txs
+        .filter((t) => t.type === '수입')
+        .reduce((a, b) => a + b.amount, 0);
+      const exp = txs
+        .filter((t) => t.type === '지출')
+        .reduce((a, b) => a + b.amount, 0);
+      result.push({
+        year: y,
+        month: m,
+        label: `${m}월`,
+        income: inc,
+        expense: exp,
+        isCurrent: offset === 0,
+      });
+    }
+    return result;
+  }, [transactions, currentYear, currentMonth, ownerFilter, includeSpecial]);
+
+  const prevMonthExpense =
+    sixMonthTrend.length >= 2
+      ? sixMonthTrend[sixMonthTrend.length - 2].expense
+      : 0;
+  const momChangePct =
+    prevMonthExpense > 0
+      ? ((reportExpense - prevMonthExpense) / prevMonthExpense) * 100
+      : null;
+
+  // 카테고리별 분석 (원형 도넛 그래프용 strokeDasharray 계산 포함)
   const categoryBreakdown = useMemo(() => {
     const map = {};
     reportTxs
@@ -472,13 +1113,22 @@ const prompt = `당신은 10년 차 공인 자산관리 전문가(PB)이자 현�
       .forEach((t) => {
         map[t.category] = (map[t.category] || 0) + t.amount;
       });
-    return Object.entries(map)
+    const sorted = Object.entries(map)
       .map(([cat, amt]) => ({
         cat,
         amt,
+        exactPct: reportExpense > 0 ? (amt / reportExpense) * 100 : 0,
         pct: reportExpense > 0 ? Math.round((amt / reportExpense) * 100) : 0,
+        color: CATEGORY_COLORS[cat] || '#64748b',
       }))
       .sort((a, b) => b.amt - a.amt);
+
+    let cumulativePct = 0;
+    return sorted.map((item) => {
+      const startPct = cumulativePct;
+      cumulativePct += item.exactPct;
+      return { ...item, startPct };
+    });
   }, [reportTxs, reportExpense]);
 
   // --- 순자산 및 투자 계산 ---
@@ -516,8 +1166,9 @@ const prompt = `당신은 10년 차 공인 자산관리 전문가(PB)이자 현�
   // --- 영수증 추가/수정/삭제 핸들러 ---
   const openAddTxModal = (dateStr) => {
     setEditingTx(null);
+    setSmsText('');
     setTxForm({
-      date: dateStr || selectedDate,
+      date: dateStr || selectedDate || todayInfo.dateStr,
       type: '지출',
       category: '식비',
       amount: '',
@@ -530,6 +1181,7 @@ const prompt = `당신은 10년 차 공인 자산관리 전문가(PB)이자 현�
 
   const openEditTxModal = (tx) => {
     setEditingTx(tx);
+    setSmsText('');
     setTxForm({ ...tx, amount: String(tx.amount) });
     setIsTxModalOpen(true);
   };
@@ -637,11 +1289,19 @@ const prompt = `당신은 10년 차 공인 자산관리 전문가(PB)이자 현�
   const saveStock = (e) => {
     e.preventDefault();
     const form = new FormData(e.target);
+    const nameStr = String(form.get('name') || '').trim();
+    const inputCode = String(form.get('code') || '').trim();
+    const autoCode =
+      inputCode ||
+      KNOWN_STOCK_CODES[nameStr.toLowerCase().replace(/\s+/g, '')] ||
+      stockModal.item?.code ||
+      '-';
+
     const item = {
       id: stockModal.item?.id || Date.now(),
       owner: form.get('owner'),
-      name: form.get('name'),
-      code: form.get('code') || '-',
+      name: nameStr,
+      code: autoCode,
       shares: Number(form.get('shares')),
       avgPrice: Number(form.get('avgPrice')),
       currentPrice: Number(form.get('currentPrice')),
@@ -718,7 +1378,7 @@ const prompt = `당신은 10년 차 공인 자산관리 전문가(PB)이자 현�
 
       {/* 메인 컨테이너 */}
       <main className="max-w-lg mx-auto p-4 flex flex-col gap-4">
-        {/* ==================== 2. 캘린더 탭 (첫 화면) ==================== */}
+        {/* ==================== 2. 캘린더 탭 ==================== */}
         {activeTab === 'calendar' && (
           <div className="flex flex-col gap-4">
             {/* 상단 타이틀 및 월 이동 바 */}
@@ -728,11 +1388,23 @@ const prompt = `당신은 10년 차 공인 자산관리 전문가(PB)이자 현�
                   <span className="text-[11px] font-bold text-[#166553] block">
                     월간 흐름
                   </span>
-                  <h2 className="text-xl font-black text-gray-900">캘린더</h2>
+                  <div className="flex items-center gap-2">
+                    <h2 className="text-xl font-black text-gray-900">캘린더</h2>
+                    <button
+                      onClick={() => {
+                        setCurrentYear(todayInfo.year);
+                        setCurrentMonth(todayInfo.month);
+                        setSelectedDate(todayInfo.dateStr);
+                      }}
+                      className="text-[10px] bg-[#ebf5f2] text-[#166553] px-2 py-0.5 rounded-full font-bold hover:bg-[#d8ece6]"
+                    >
+                      오늘로 이동
+                    </button>
+                  </div>
                 </div>
                 <div className="flex items-center gap-2 bg-gray-100 px-3 py-1.5 rounded-full text-xs font-extrabold text-gray-700">
                   <button
-                    onClick={() => setCurrentMonth((m) => (m > 1 ? m - 1 : 12))}
+                    onClick={handlePrevMonth}
                     className="hover:text-[#166553]"
                   >
                     <ChevronLeft size={16} />
@@ -741,7 +1413,7 @@ const prompt = `당신은 10년 차 공인 자산관리 전문가(PB)이자 현�
                     {currentYear}년 {currentMonth}월
                   </span>
                   <button
-                    onClick={() => setCurrentMonth((m) => (m < 12 ? m + 1 : 1))}
+                    onClick={handleNextMonth}
                     className="hover:text-[#166553]"
                   >
                     <ChevronRight size={16} />
@@ -778,6 +1450,7 @@ const prompt = `당신은 10년 차 공인 자산관리 전문가(PB)이자 현�
                     currentMonth
                   ).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
                   const isSelected = selectedDate === dateStr;
+                  const isToday = todayInfo.dateStr === dateStr;
                   const holidayName = HOLIDAYS[dateStr];
                   const dayOfWeek = (firstDayOfWeek + i) % 7;
                   const isSundayOrHoliday =
@@ -809,6 +1482,8 @@ const prompt = `당신은 10년 차 공인 자산관리 전문가(PB)이자 현�
                           className={`text-xs font-extrabold w-6 h-6 flex items-center justify-center rounded-full ${
                             isSelected
                               ? 'bg-[#166553] text-white'
+                              : isToday
+                              ? 'bg-emerald-100 text-[#166553] ring-1 ring-[#166553]'
                               : isSundayOrHoliday
                               ? 'text-red-500'
                               : dayOfWeek === 5
@@ -883,7 +1558,7 @@ const prompt = `당신은 10년 차 공인 자산관리 전문가(PB)이자 현�
               <div className="flex justify-between items-center border-b border-gray-100 pb-2.5">
                 <div className="flex items-center gap-2">
                   <span className="text-sm font-black text-gray-900">
-                    🧾 {selectedDate} 영수증 내역
+                    🧾 {selectedDate} 내역
                   </span>
                   {HOLIDAYS[selectedDate] && (
                     <span className="text-[10px] bg-red-50 text-red-500 font-bold px-2 py-0.5 rounded-full">
@@ -891,12 +1566,24 @@ const prompt = `당신은 10년 차 공인 자산관리 전문가(PB)이자 현�
                     </span>
                   )}
                 </div>
-                <button
-                  onClick={() => openAddTxModal(selectedDate)}
-                  className="text-xs bg-[#166553] text-white px-3 py-1.5 rounded-xl font-bold hover:opacity-90 transition"
-                >
-                  + 내역 입력
-                </button>
+                <div className="flex items-center gap-1.5">
+                  <button
+                    onClick={() => {
+                      setBulkSmsText('');
+                      setParsedBulkItems([]);
+                      setIsBulkSmsModalOpen(true);
+                    }}
+                    className="text-[11px] bg-[#ebf5f2] text-[#166553] px-2.5 py-1.5 rounded-xl font-bold hover:bg-[#d8ece6] transition flex items-center gap-1"
+                  >
+                    <MessageSquarePlus size={13} /> 문자 일괄입력
+                  </button>
+                  <button
+                    onClick={() => openAddTxModal(selectedDate)}
+                    className="text-xs bg-[#166553] text-white px-3 py-1.5 rounded-xl font-bold hover:opacity-90 transition"
+                  >
+                    + 내역 입력
+                  </button>
+                </div>
               </div>
 
               <div className="flex flex-col gap-2">
@@ -969,9 +1656,23 @@ const prompt = `당신은 10년 차 공인 자산관리 전문가(PB)이자 현�
             {/* 상단 헤더 & 용돈·특별지출 토글 & 이미지 출력 */}
             <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100 flex justify-between items-center">
               <div>
-                <span className="text-[11px] font-bold text-[#166553] block">
-                  {currentYear}년 {currentMonth}월
-                </span>
+                <div className="flex items-center gap-1.5">
+                  <button
+                    onClick={handlePrevMonth}
+                    className="text-gray-400 hover:text-[#166553]"
+                  >
+                    <ChevronLeft size={14} />
+                  </button>
+                  <span className="text-[11px] font-bold text-[#166553]">
+                    {currentYear}년 {currentMonth}월
+                  </span>
+                  <button
+                    onClick={handleNextMonth}
+                    className="text-gray-400 hover:text-[#166553]"
+                  >
+                    <ChevronRight size={14} />
+                  </button>
+                </div>
                 <h2 className="text-lg font-black text-gray-900">
                   월간 소비 리포트
                 </h2>
@@ -995,7 +1696,7 @@ const prompt = `당신은 10년 차 공인 자산관리 전문가(PB)이자 현�
               </div>
             </div>
 
-            {/* 2x2 요약 카드 */}
+            {/* 2x2 요약 카드 (실제 전월 대비 증감률 반영) */}
             <div className="grid grid-cols-2 gap-2.5">
               <div className="bg-white p-3.5 rounded-2xl shadow-sm border border-gray-100">
                 <span className="text-[11px] text-gray-400 font-bold block">
@@ -1007,7 +1708,12 @@ const prompt = `당신은 10년 차 공인 자산관리 전문가(PB)이자 현�
               </div>
               <div className="bg-white p-3.5 rounded-2xl shadow-sm border border-gray-100">
                 <span className="text-[11px] text-gray-400 font-bold block">
-                  이번 달 지출 (전월비 -8.2%)
+                  이번 달 지출{' '}
+                  {momChangePct !== null
+                    ? `(전월비 ${momChangePct >= 0 ? '+' : ''}${momChangePct.toFixed(
+                        1
+                      )}%)`
+                    : '(전월 내역 없음)'}
                 </span>
                 <span className="text-base font-black text-red-500">
                   -{reportExpense.toLocaleString()}원
@@ -1031,6 +1737,181 @@ const prompt = `당신은 10년 차 공인 자산관리 전문가(PB)이자 현�
               </div>
             </div>
 
+            {/* 3) 카테고리별 소비 비중 원형(도넛) 그래프 카드 */}
+            <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100 flex flex-col gap-4">
+              <div className="flex justify-between items-center">
+                <span className="text-xs font-extrabold text-gray-800 flex items-center gap-1.5">
+                  <PieChart size={15} className="text-[#166553]" />
+                  카테고리별 소비 비율 (원형 그래프)
+                </span>
+                <span className="text-[11px] font-bold text-gray-400">
+                  총 {categoryBreakdown.length}개 영역
+                </span>
+              </div>
+
+              {categoryBreakdown.length === 0 ? (
+                <div className="py-8 text-center text-xs text-gray-400 font-medium">
+                  이번 달 지출 내역이 아직 없습니다.
+                </div>
+              ) : (
+                <div className="flex flex-col sm:flex-row items-center gap-5 py-1">
+                  {/* 도넛형 SVG 차트 */}
+                  <div className="relative w-40 h-40 flex items-center justify-center shrink-0">
+                    <svg
+                      viewBox="0 0 42 42"
+                      className="w-full h-full -rotate-90"
+                    >
+                      <circle
+                        cx="21"
+                        cy="21"
+                        r="15.9155"
+                        fill="transparent"
+                        stroke="#f1f5f9"
+                        strokeWidth="6"
+                      />
+                      {categoryBreakdown.map((item) => (
+                        <circle
+                          key={item.cat}
+                          cx="21"
+                          cy="21"
+                          r="15.9155"
+                          fill="transparent"
+                          stroke={item.color}
+                          strokeWidth="6"
+                          strokeDasharray={`${item.exactPct} ${
+                            100 - item.exactPct
+                          }`}
+                          strokeDashoffset={-item.startPct}
+                        />
+                      ))}
+                    </svg>
+                    <div className="absolute inset-0 flex flex-col items-center justify-center text-center px-2">
+                      <span className="text-[10px] text-gray-400 font-bold">
+                        총지출
+                      </span>
+                      <span className="text-xs font-black text-gray-900">
+                        {(reportExpense / 10000).toFixed(0)}만원
+                      </span>
+                      {categoryBreakdown[0] && (
+                        <span className="text-[9px] font-extrabold text-[#166553] mt-0.5">
+                          1위 {categoryBreakdown[0].cat} (
+                          {categoryBreakdown[0].pct}%)
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* 오른쪽 카테고리 범례 및 비율 리스트 */}
+                  <div className="flex-1 w-full flex flex-col gap-2">
+                    {categoryBreakdown.map((item) => (
+                      <div
+                        key={item.cat}
+                        className="flex items-center justify-between text-xs"
+                      >
+                        <div className="flex items-center gap-2">
+                          <span
+                            className="w-2.5 h-2.5 rounded-full shrink-0"
+                            style={{ backgroundColor: item.color }}
+                          />
+                          <span className="font-bold text-gray-700">
+                            {item.cat}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-gray-500 font-semibold text-[11px]">
+                            {item.amt.toLocaleString()}원
+                          </span>
+                          <span className="font-black text-gray-900 w-10 text-right">
+                            {item.pct}%
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* 추천 1) 최근 6개월 월별 수입·지출 비교 막대그래프 */}
+            <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100 flex flex-col gap-3">
+              <div className="flex justify-between items-center">
+                <span className="text-xs font-extrabold text-gray-800 flex items-center gap-1.5">
+                  <BarChart2 size={15} className="text-[#166553]" />
+                  최근 6개월 월별 소비·수입 비교
+                </span>
+                <div className="flex items-center gap-3 text-[10px] font-bold">
+                  <span className="flex items-center gap-1 text-emerald-600">
+                    <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
+                    수입
+                  </span>
+                  <span className="flex items-center gap-1 text-red-500">
+                    <span className="w-2 h-2 rounded-full bg-red-400"></span>
+                    지출
+                  </span>
+                </div>
+              </div>
+
+              {(() => {
+                const maxVal = Math.max(
+                  100000,
+                  ...sixMonthTrend.map((m) => Math.max(m.income, m.expense))
+                );
+                return (
+                  <div className="grid grid-cols-6 gap-2 pt-4 pb-1 px-2 bg-[#f8fbfa] rounded-xl border border-gray-100">
+                    {sixMonthTrend.map((item) => {
+                      const incHeight = Math.round(
+                        (item.income / maxVal) * 80
+                      );
+                      const expHeight = Math.round(
+                        (item.expense / maxVal) * 80
+                      );
+                      return (
+                        <div
+                          key={`${item.year}-${item.month}`}
+                          onClick={() => {
+                            setCurrentYear(item.year);
+                            setCurrentMonth(item.month);
+                          }}
+                          className={`flex flex-col items-center cursor-pointer rounded-lg p-1 transition ${
+                            item.isCurrent
+                              ? 'bg-[#ebf5f2] ring-1 ring-[#166553]/30'
+                              : 'hover:bg-gray-100'
+                          }`}
+                        >
+                          <div className="h-24 flex items-end gap-1">
+                            <div
+                              title={`수입: ${item.income.toLocaleString()}원`}
+                              className="w-2.5 bg-emerald-500 rounded-t transition-all"
+                              style={{ height: `${Math.max(4, incHeight)}px` }}
+                            />
+                            <div
+                              title={`지출: ${item.expense.toLocaleString()}원`}
+                              className="w-2.5 bg-red-400 rounded-t transition-all"
+                              style={{ height: `${Math.max(4, expHeight)}px` }}
+                            />
+                          </div>
+                          <span
+                            className={`text-[10px] mt-1.5 font-extrabold ${
+                              item.isCurrent
+                                ? 'text-[#166553]'
+                                : 'text-gray-500'
+                            }`}
+                          >
+                            {item.label}
+                          </span>
+                          <span className="text-[9px] text-gray-400 font-bold">
+                            {item.expense > 0
+                              ? `${Math.round(item.expense / 10000)}만`
+                              : '0'}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                );
+              })()}
+            </div>
+
             {/* 생활 지출 목표 프로그레스 바 */}
             <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100 flex flex-col gap-3">
               <div className="flex justify-between items-center">
@@ -1049,83 +1930,16 @@ const prompt = `당신은 10년 차 공인 자산관리 전문가(PB)이자 현�
               </div>
               <div className="bg-[#ebf5f2] text-[#166553] px-3 py-2.5 rounded-xl text-xs font-bold flex items-center justify-between">
                 <span>
-                  🎯 목표 페이스보다{' '}
+                  🎯 목표 예산보다{' '}
                   <b>{Math.abs(remainingBudget).toLocaleString()}원</b>{' '}
-                  {remainingBudget >= 0 ? '적게 사용 중!' : '초과 사용 중!'}
+                  {remainingBudget >= 0 ? '여유 있습니다!' : '초과 사용 중!'}
                 </span>
                 <span>{budgetProgress}%</span>
               </div>
             </div>
 
-            {/* 1일부터 누적 지출 흐름 그래프 (SVG) 및 AI 소비 분석 */}
+            {/* AI 소비 분석 코멘트 (Gemini 실시간 연동) */}
             <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100 flex flex-col gap-3">
-              <div className="flex justify-between items-center">
-                <span className="text-xs font-extrabold text-gray-800">
-                  📈 1일~말일 누적 지출 흐름 (목표 점선 vs 실제 실선)
-                </span>
-                <span className="text-[11px] font-bold text-gray-500">
-                  예상 월말 지출:{' '}
-                  {(avgDailyExpense * daysInMonth).toLocaleString()}원
-                </span>
-              </div>
-              <div className="h-36 w-full bg-[#f8fbfa] rounded-xl p-3 flex items-end relative border border-gray-100">
-                <svg
-                  viewBox="0 0 300 100"
-                  className="w-full h-full overflow-visible"
-                >
-                  {/* 목표 점선 */}
-                  <line
-                    x1="0"
-                    y1="95"
-                    x2="300"
-                    y2="15"
-                    stroke="#9ca3af"
-                    strokeWidth="1.5"
-                    strokeDasharray="4 4"
-                  />
-                  {/* 실제 누적 실선 */}
-                  <polyline
-                    fill="none"
-                    stroke="#166553"
-                    strokeWidth="3"
-                    points={`0,95 60,80 120,68 180,${Math.max(
-                      15,
-                      95 - budgetProgress * 0.7
-                    )} 240,${Math.max(
-                      10,
-                      95 - budgetProgress * 0.8
-                    )} 300,${Math.max(5, 95 - budgetProgress * 0.85)}`}
-                  />
-                </svg>
-              </div>
-
-              {/* 카테고리별 지출 비중 */}
-              <div className="flex flex-col gap-2 pt-2">
-                <span className="text-xs font-extrabold text-gray-800">
-                  카테고리별 지출 Top 항목
-                </span>
-                {categoryBreakdown.map((item) => (
-                  <div
-                    key={item.cat}
-                    className="flex items-center justify-between text-xs"
-                  >
-                    <span className="font-bold text-gray-700 w-24">
-                      {item.cat}
-                    </span>
-                    <div className="flex-1 mx-2 h-2 bg-gray-100 rounded-full overflow-hidden">
-                      <div
-                        className="h-full bg-[#166553]"
-                        style={{ width: `${item.pct}%` }}
-                      />
-                    </div>
-                    <span className="font-extrabold text-gray-900 w-28 text-right">
-                      {item.amt.toLocaleString()}원 ({item.pct}%)
-                    </span>
-                  </div>
-                ))}
-              </div>
-
-              {/* AI 소비 분석 코멘트 (Gemini 실시간 연동) */}
               <div className="bg-[#ebf5f2] p-3.5 rounded-xl border border-[#166553]/20 flex flex-col gap-2">
                 <div className="flex justify-between items-center">
                   <span className="text-xs font-black text-[#166553] flex items-center gap-1">
@@ -1217,7 +2031,7 @@ const prompt = `당신은 10년 차 공인 자산관리 전문가(PB)이자 현�
               </div>
             </div>
 
-            {/* 부부 통장 쪼개기 잔액 현황 (직접 수정/추가 가능) */}
+            {/* 부부 통장 쪼개기 잔액 현황 */}
             <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100 flex flex-col gap-3">
               <div className="flex justify-between items-center">
                 <span className="text-sm font-black text-gray-900">
@@ -1273,7 +2087,7 @@ const prompt = `당신은 10년 차 공인 자산관리 전문가(PB)이자 현�
               </div>
             </div>
 
-            {/* 부동산/보증금 & 대출 내역 (직접 수정 가능) */}
+            {/* 부동산/보증금 & 대출 내역 */}
             <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100 flex flex-col gap-3">
               <div className="flex justify-between items-center">
                 <span className="text-sm font-black text-gray-900">
@@ -1361,13 +2175,20 @@ const prompt = `당신은 10년 차 공인 자산관리 전문가(PB)이자 현�
               </div>
             </div>
 
-            {/* 주식·ETF 포트폴리오 & 평단가 자동 계산기 */}
+            {/* 주식·ETF 포트폴리오 (실시간 시세 API 연동 버튼 포함) */}
             <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100 flex flex-col gap-3">
-              <div className="flex justify-between items-center">
+              <div className="flex justify-between items-start gap-2">
                 <div>
-                  <span className="text-sm font-black text-gray-900 block">
-                    📈 주식·ETF 포트폴리오
-                  </span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-black text-gray-900">
+                      📈 주식·ETF 포트폴리오
+                    </span>
+                    {lastStockSyncTime && (
+                      <span className="text-[10px] bg-emerald-50 text-[#166553] px-1.5 py-0.5 rounded font-bold">
+                        {lastStockSyncTime}
+                      </span>
+                    )}
+                  </div>
                   <span
                     className={`text-xs font-extrabold ${
                       totalStockProfit >= 0 ? 'text-red-500' : 'text-blue-500'
@@ -1379,12 +2200,23 @@ const prompt = `당신은 10년 차 공인 자산관리 전문가(PB)이자 현�
                     {totalStockRate.toFixed(2)}%)
                   </span>
                 </div>
-                <div className="flex gap-1.5">
+                <div className="flex flex-wrap justify-end gap-1.5">
+                  <button
+                    onClick={() => syncRealTimeStockPrices(false)}
+                    disabled={isStockSyncing}
+                    className="text-[11px] bg-[#ebf5f2] text-[#166553] px-2.5 py-1.5 rounded-lg font-extrabold flex items-center gap-1 hover:bg-[#d8ece6] transition disabled:opacity-50"
+                  >
+                    <RefreshCw
+                      size={12}
+                      className={isStockSyncing ? 'animate-spin' : ''}
+                    />
+                    {isStockSyncing ? '시세 연동중...' : '실시간 시세 연동'}
+                  </button>
                   <button
                     onClick={() => setBulkPriceModal(true)}
-                    className="text-[11px] bg-gray-100 text-gray-700 px-2.5 py-1.5 rounded-lg font-bold"
+                    className="text-[11px] bg-gray-100 text-gray-700 px-2 py-1.5 rounded-lg font-bold"
                   >
-                    시세 일괄수정
+                    수동수정
                   </button>
                   <button
                     onClick={() => setStockModal({ open: true, item: null })}
@@ -1414,6 +2246,11 @@ const prompt = `당신은 10년 차 공인 자산관리 전문가(PB)이자 현�
                           <span className="text-xs font-extrabold text-gray-900">
                             {st.name}
                           </span>
+                          {st.code && st.code !== '-' && (
+                            <span className="text-[10px] text-gray-400 font-semibold">
+                              ({st.code})
+                            </span>
+                          )}
                         </div>
                         <span className="text-[11px] text-gray-500 mt-0.5">
                           보유 {st.shares}주 · 평단{' '}
@@ -1679,12 +2516,12 @@ const prompt = `당신은 10년 차 공인 자산관리 전문가(PB)이자 현�
       </nav>
 
       {/* ==================== 모달창 영역 ==================== */}
-      {/* 1) 영수증 입력/수정 모달 */}
+      {/* 1) 영수증 입력/수정 모달 (카드 결제 문자 자동분석 포함) */}
       {isTxModalOpen && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
           <form
             onSubmit={handleSaveTx}
-            className="bg-white rounded-2xl p-5 w-full max-w-sm flex flex-col gap-3 shadow-xl"
+            className="bg-white rounded-2xl p-5 w-full max-w-sm flex flex-col gap-3 shadow-xl max-h-[90vh] overflow-y-auto"
           >
             <div className="flex justify-between items-center">
               <span className="font-black text-gray-900">
@@ -1694,6 +2531,33 @@ const prompt = `당신은 10년 차 공인 자산관리 전문가(PB)이자 현�
                 <X size={20} />
               </button>
             </div>
+
+            {/* 추천 4) 카드 결제 문자/카톡 붙여넣기 자동 완성 박스 */}
+            {!editingTx && (
+              <div className="bg-[#f4f9f7] border border-[#166553]/20 rounded-xl p-3 flex flex-col gap-2">
+                <div className="flex justify-between items-center">
+                  <span className="text-[11px] font-extrabold text-[#166553] flex items-center gap-1">
+                    📱 카드 결제 문자·카톡 자동 입력
+                  </span>
+                  <button
+                    type="button"
+                    onClick={handleAnalyzeSingleSms}
+                    disabled={isSmsParsing || !smsText.trim()}
+                    className="text-[11px] bg-[#166553] text-white px-2.5 py-1 rounded-lg font-bold disabled:opacity-40"
+                  >
+                    {isSmsParsing ? 'AI 분석중...' : '⚡ 자동 채우기'}
+                  </button>
+                </div>
+                <textarea
+                  value={smsText}
+                  onChange={(e) => setSmsText(e.target.value)}
+                  placeholder="카드 승인 문자나 '할머니순대국 18000원', 'LGU+ 25000원 결제' 등을 붙여넣고 [자동 채우기]를 누르세요!"
+                  rows={2}
+                  className="w-full bg-white border border-gray-200 rounded-lg p-2 text-xs font-medium resize-none focus:outline-none focus:border-[#166553]"
+                />
+              </div>
+            )}
+
             <div className="grid grid-cols-2 gap-2">
               {['지출', '수입'].map((t) => (
                 <button
@@ -1738,17 +2602,7 @@ const prompt = `당신은 10년 차 공인 자산관리 전문가(PB)이자 현�
                 }
                 className="border rounded-xl px-3 py-2 text-xs font-bold"
               >
-                {[
-                  '식비',
-                  '외식/카페',
-                  '주거/통신',
-                  '쇼핑/생활',
-                  '문화/여가',
-                  '의료/건강',
-                  '용돈/기타',
-                  '급여',
-                  '부수입',
-                ].map((c) => (
+                {ALL_CATEGORIES.map((c) => (
                   <option key={c} value={c}>
                     {c}
                   </option>
@@ -1765,9 +2619,19 @@ const prompt = `당신은 10년 차 공인 자산관리 전문가(PB)이자 현�
             />
             <input
               type="text"
-              placeholder="메모 (예: 마트 장보기)"
+              placeholder="메모 (예: 마트 장보기, 식당 이름)"
               value={txForm.memo}
-              onChange={(e) => setTxForm({ ...txForm, memo: e.target.value })}
+              onChange={(e) => {
+                const newMemo = e.target.value;
+                // 메모를 직접 입력할 때도 자동으로 식당/통신비/교통비 등 카테고리 추론
+                const guessed = classifyKoreanMerchant(newMemo);
+                setTxForm((prev) => ({
+                  ...prev,
+                  memo: newMemo,
+                  category:
+                    guessed !== '용돈/기타' ? guessed : prev.category,
+                }));
+              }}
               className="border rounded-xl px-3 py-2 text-xs font-bold"
             />
             <label className="flex items-center gap-2 text-xs font-bold text-gray-600">
@@ -1788,6 +2652,88 @@ const prompt = `당신은 10년 차 공인 자산관리 전문가(PB)이자 현�
               저장하기
             </button>
           </form>
+        </div>
+      )}
+
+      {/* 1-2) 카드 결제 문자 여러 건 일괄 입력 모달 */}
+      {isBulkSmsModalOpen && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl p-5 w-full max-w-md flex flex-col gap-3 shadow-xl max-h-[90vh] overflow-y-auto text-xs">
+            <div className="flex justify-between items-center">
+              <span className="font-black text-sm text-gray-900">
+                📱 카드 승인 문자 여러 건 일괄 입력
+              </span>
+              <button onClick={() => setIsBulkSmsModalOpen(false)}>
+                <X size={18} />
+              </button>
+            </div>
+            <p className="text-gray-500 leading-relaxed">
+              여러 개의 카드 결제 문자(빈 줄로 구분)를 그대로 붙여넣으시면,
+              식당·통신비·교통비·마트 등을 AI와 업종 사전으로 자동 분류합니다.
+            </p>
+            <textarea
+              value={bulkSmsText}
+              onChange={(e) => setBulkSmsText(e.target.value)}
+              rows={5}
+              placeholder={`예시:\n[신한카드 승인]\n28,600원 일시불\n10/25 19:30 송도숯불갈비\n\nLGU+ 통신요금 45,000원 결제`}
+              className="w-full border border-gray-200 rounded-xl p-3 text-xs font-medium resize-y focus:outline-none focus:border-[#166553]"
+            />
+            <button
+              type="button"
+              onClick={handleAnalyzeBulkSms}
+              disabled={isBulkSmsLoading || !bulkSmsText.trim()}
+              className="bg-[#ebf5f2] text-[#166553] py-2 rounded-xl font-extrabold hover:bg-[#d8ece6] disabled:opacity-40"
+            >
+              {isBulkSmsLoading
+                ? '🤖 AI가 가맹점 업종 분석 중...'
+                : '🔍 내역 분석하기'}
+            </button>
+
+            {parsedBulkItems.length > 0 && (
+              <div className="flex flex-col gap-2 pt-2 border-t border-gray-100">
+                <span className="font-extrabold text-gray-800">
+                  분석 결과 ({parsedBulkItems.length}건) - 카테고리 수정 가능
+                </span>
+                {parsedBulkItems.map((item, idx) => (
+                  <div
+                    key={idx}
+                    className="flex items-center justify-between gap-2 bg-[#f8fbfa] p-2.5 rounded-xl border border-gray-100"
+                  >
+                    <div className="flex flex-col flex-1 min-w-0">
+                      <span className="font-extrabold text-gray-900 truncate">
+                        {item.memo}
+                      </span>
+                      <span className="text-[10px] text-gray-400">
+                        {item.date} · {Number(item.amount).toLocaleString()}원
+                      </span>
+                    </div>
+                    <select
+                      value={item.category}
+                      onChange={(e) => {
+                        const next = [...parsedBulkItems];
+                        next[idx] = { ...next[idx], category: e.target.value };
+                        setParsedBulkItems(next);
+                      }}
+                      className="border rounded-lg px-2 py-1 font-bold text-xs bg-white"
+                    >
+                      {EXPENSE_CATEGORIES.map((c) => (
+                        <option key={c} value={c}>
+                          {c}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                ))}
+                <button
+                  type="button"
+                  onClick={handleSaveBulkSmsItems}
+                  className="bg-[#166553] text-white py-2.5 rounded-xl font-extrabold mt-1"
+                >
+                  가계부에 {parsedBulkItems.length}건 일괄 저장하기
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       )}
 
@@ -1971,7 +2917,7 @@ const prompt = `당신은 10년 차 공인 자산관리 전문가(PB)이자 현�
         </div>
       )}
 
-      {/* 5) 주식/ETF 개별 수정/추가 모달 */}
+      {/* 5) 주식/ETF 개별 수정/추가 모달 (종목코드 입력 지원) */}
       {stockModal.open && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
           <form
@@ -2001,9 +2947,19 @@ const prompt = `당신은 10년 차 공인 자산관리 전문가(PB)이자 현�
             <input
               name="name"
               defaultValue={stockModal.item?.name || ''}
-              placeholder="종목명 (예: 삼성전자)"
+              placeholder="종목명 (예: 삼성전자, TIGER 미국S&P500)"
               className="border rounded-xl px-3 py-2 font-bold"
               required
+            />
+            <input
+              name="code"
+              defaultValue={
+                stockModal.item?.code && stockModal.item?.code !== '-'
+                  ? stockModal.item.code
+                  : ''
+              }
+              placeholder="종목코드 6자리 (선택, 비워두면 이름으로 자동검색)"
+              className="border rounded-xl px-3 py-2 font-bold"
             />
             <input
               name="shares"
@@ -2025,7 +2981,7 @@ const prompt = `당신은 10년 차 공인 자산관리 전문가(PB)이자 현�
               name="currentPrice"
               type="number"
               defaultValue={stockModal.item?.currentPrice || ''}
-              placeholder="현재가 (원)"
+              placeholder="현재가 (원, 저장 후 실시간 시세연동 가능)"
               className="border rounded-xl px-3 py-2 font-bold"
               required
             />
@@ -2045,7 +3001,7 @@ const prompt = `당신은 10년 차 공인 자산관리 전문가(PB)이자 현�
           <div className="bg-white rounded-2xl p-5 w-full max-w-sm flex flex-col gap-3 shadow-xl text-xs">
             <div className="flex justify-between items-center">
               <span className="font-black text-sm">
-                ⚡ 보유 종목 현재가 일괄 업데이트
+                ⚡ 보유 종목 현재가 수동 업데이트
               </span>
               <button onClick={() => setBulkPriceModal(false)}>
                 <X size={18} />
