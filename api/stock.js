@@ -106,6 +106,7 @@ export default async function handler(req, res) {
     return null;
   }
 
+  // 실시간 현재가 조회
   async function fetchBasicPrice(code) {
     if (!code) return null;
     try {
@@ -134,12 +135,42 @@ export default async function handler(req, res) {
     return null;
   }
 
+  // 직전 달(전월) 마지막 거래일 공식 종가 실시간 조회
+  async function fetchPrevMonthPrice(code) {
+    if (!code) return null;
+    try {
+      const now = new Date();
+      // 전월 prefix 계산 (예: 10월이면 9월 '2026-09')
+      const prevDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+      const prevYear = prevDate.getFullYear();
+      const prevMonth = String(prevDate.getMonth() + 1).padStart(2, '0');
+      const targetPrefix = `${prevYear}-${prevMonth}`;
+
+      const url = `https://m.stock.naver.com/api/stock/${encodeURIComponent(code)}/price?page=1&pageSize=35&_=${Date.now()}`;
+      const r = await fetch(url, {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
+          'Cache-Control': 'no-cache'
+        }
+      });
+      if (!r.ok) return null;
+      const data = await r.json();
+      const list = Array.isArray(data) ? data : (data?.value || []);
+      const match = list.find((it) => it?.localTradedAt && it.localTradedAt.startsWith(targetPrefix));
+      if (match?.closePrice) {
+        const p = Number(String(match.closePrice).replace(/,/g, ''));
+        if (!isNaN(p) && p > 0) return p;
+      }
+    } catch (e) {}
+    return null;
+  }
+
   try {
     const items = req.method === 'POST' ? (req.body?.stocks || []) : [
       { id: 'q', name: req.query?.name || '', code: req.query?.code || '' }
     ];
 
-    // Fetch full ETF list in parallel (for accurate ETF code & instant price lookup)
+    // ETF 리스트 로드
     let etfList = [];
     try {
       const etfRes = await fetch('https://finance.naver.com/api/sise/etfItemList.nhn?_=' + Date.now(), {
@@ -160,35 +191,44 @@ export default async function handler(req, res) {
         const rawCode = String(st.code || '').trim();
         const validInputCode = /^[0-9A-Z]{6}$/i.test(rawCode) ? rawCode.toUpperCase() : '';
 
-        // Always try resolving code from name first so stale/wrong codes get corrected
         const nameResolvedCode = await searchCodeByName(rawName, etfList);
-
         let targetCode = nameResolvedCode || validInputCode;
 
-        // If user entered a valid code but name didn't resolve, use validInputCode
-        // If both exist and differ, verify whether validInputCode's actual stockName matches rawName
         if (validInputCode && nameResolvedCode && validInputCode !== nameResolvedCode) {
           const checkInput = await fetchBasicPrice(validInputCode);
           if (checkInput && rawName && normalize(checkInput.name).includes(normalize(rawName))) {
-            results[st.id] = checkInput;
+            const prevP = await fetchPrevMonthPrice(validInputCode);
+            results[st.id] = {
+              ...checkInput,
+              prevMonthPrice: prevP || null
+            };
             return;
           }
           targetCode = nameResolvedCode;
         }
 
         if (targetCode) {
-          const info = await fetchBasicPrice(targetCode);
+          const [info, prevP] = await Promise.all([
+            fetchBasicPrice(targetCode),
+            fetchPrevMonthPrice(targetCode)
+          ]);
+
           if (info && info.price > 0) {
-            results[st.id] = info;
+            results[st.id] = {
+              ...info,
+              prevMonthPrice: prevP || null
+            };
             return;
           }
-          // Fallback to etfList price if basic API failed
+
+          // Fallback to etfList price
           const etfMatch = etfList.find((it) => it.itemcode === targetCode);
           if (etfMatch?.nowVal) {
             results[st.id] = {
               code: targetCode,
               name: etfMatch.itemname,
-              price: Number(etfMatch.nowVal)
+              price: Number(etfMatch.nowVal),
+              prevMonthPrice: prevP || null
             };
           }
         }
