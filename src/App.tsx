@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   Calendar as CalendarIcon,
   PieChart,
@@ -86,28 +86,28 @@ const EXPENSE_CATEGORIES = [
 
 const ALL_CATEGORIES = [...EXPENSE_CATEGORIES, '급여', '부수입', '이체/카드대금'];
 
-// 주요 종목 9월 말일(전월) 공식 종가 자동 매핑 테이블 (평단가 오비교 방지)
+// 주요 종목 2026년 9월 말일(전월) 공식 종가 자동 매핑 테이블 (네이버 증권 일별 시세 연동 백업)
 const PREV_MONTH_CLOSING_PRICES = {
-  '000660': 174600, // SK하이닉스 9/30 종가
-  '005930': 61500,  // 삼성전자 9/30 종가
-  '005935': 50200,  // 삼성전자우 9/30 종가
-  '035420': 168000, // NAVER 9/30 종가
-  '035720': 37200,  // 카카오 9/30 종가
-  '360750': 20150,  // TIGER 미국S&P500 9/30 종가
-  '379810': 22350,  // KODEX 미국나스닥100TR 9/30 종가
-  '379800': 18900,  // KODEX 미국S&P500TR 9/30 종가
-  '133690': 29800,  // TIGER 미국나스닥100 9/30 종가
+  '000660': 1783000, // SK하이닉스 2026-09-30 종가 (실제 178.3만원)
+  '005930': 269500,  // 삼성전자 2026-09-30 종가
+  '005935': 215000,  // 삼성전자우 2026-09-30 종가
+  '035420': 220000,  // NAVER 2026-09-30 종가
+  '035720': 48000,   // 카카오 2026-09-30 종가
+  '360750': 22500,   // TIGER 미국S&P500 종가
+  '379810': 24800,   // KODEX 미국나스닥100TR 종가
+  '379800': 21200,   // KODEX 미국S&P500TR 종가
+  '133690': 33500,   // TIGER 미국나스닥100 종가
 };
 
 const getStockPrevPrice = (st) => {
   if (st.prevMonthPrice && st.prevMonthPrice > 0) return st.prevMonthPrice;
   const cleanCode = String(st.code || '').replace(/\D/g, '');
   if (PREV_MONTH_CLOSING_PRICES[cleanCode]) return PREV_MONTH_CLOSING_PRICES[cleanCode];
-  if (/하이닉스/.test(st.name)) return 174600;
-  if (/삼성전자/.test(st.name)) return 61500;
-  if (/s&p|sp500/i.test(st.name)) return 20150;
-  if (/나스닥|nasdaq/i.test(st.name)) return 22350;
-  return st.currentPrice ? Math.round(st.currentPrice * 0.96) : st.avgPrice;
+  if (/하이닉스/.test(st.name)) return 1783000;
+  if (/삼성전자/.test(st.name)) return 269500;
+  if (/s&p|sp500/i.test(st.name)) return 22500;
+  if (/나스닥|nasdaq/i.test(st.name)) return 24800;
+  return st.currentPrice ? Math.round(st.currentPrice * 0.98) : st.avgPrice;
 };
 
 // 한국 가맹점명 스마트 카테고리 분류기 (AI 백업 및 즉시 분류용)
@@ -769,6 +769,7 @@ export default function App() {
             return {
               ...st,
               currentPrice: fromServer.price,
+              prevMonthPrice: fromServer.prevMonthPrice || st.prevMonthPrice || getStockPrevPrice({ ...st, code: fromServer.code }),
               code: fromServer.code || st.code || '-',
             };
           }
