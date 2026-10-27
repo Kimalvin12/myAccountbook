@@ -69,6 +69,7 @@ const CATEGORY_COLORS = {
   '용돈/기타': '#64748b',
   '급여': '#059669',
   '부수입': '#34d399',
+  '이체/카드대금': '#6366f1',
 };
 
 const EXPENSE_CATEGORIES = [
@@ -83,11 +84,20 @@ const EXPENSE_CATEGORIES = [
   '용돈/기타',
 ];
 
-const ALL_CATEGORIES = [...EXPENSE_CATEGORIES, '급여', '부수입'];
+const ALL_CATEGORIES = [...EXPENSE_CATEGORIES, '급여', '부수입', '이체/카드대금'];
 
 // 한국 가맹점명 스마트 카테고리 분류기 (AI 백업 및 즉시 분류용)
 function classifyKoreanMerchant(storeName) {
   const s = (storeName || '').toLowerCase().replace(/\s+/g, '');
+
+  // 0) 카드대금 / 이체 자동 감지 (지출 합계 및 도넛 차트에서 완전 제외)
+  if (
+    /카드대금|카드결제대금|신한카드출금|국민카드출금|삼성카드출금|현대카드출금|롯데카드출금|우리카드출금|하나카드출금|비씨카드출금|bc카드출금|카드값|결제대금|타행이체|계좌이체/.test(
+      s
+    )
+  ) {
+    return '이체/카드대금';
+  }
 
   // 1) 주거/통신/공과금
   if (
@@ -431,6 +441,10 @@ export default function App() {
   const [calcStockId, setCalcStockId] = useState(1);
   const [addShares, setAddShares] = useState('50');
   const [addPrice, setAddPrice] = useState('205000');
+
+  // 리포트 탭: 순자산 추이 툴팁 및 금융자산 전월비 상세 토글
+  const [selectedTrendIndex, setSelectedTrendIndex] = useState(5);
+  const [isStockDetailOpen, setIsStockDetailOpen] = useState(false);
 
   // --- Firebase 실시간 동기화 ---
   useEffect(() => {
@@ -1098,8 +1112,12 @@ ${bulkSmsText.trim()}
   const reportIncome = reportTxs
     .filter((t) => t.type === '수입')
     .reduce((a, b) => a + b.amount, 0);
+  // 카드대금 납부 건은 순수 생활 지출 및 도넛 차트에서 완전 제외 (이중 지출 방지)
   const reportExpense = reportTxs
-    .filter((t) => t.type === '지출')
+    .filter((t) => t.type === '지출' && t.category !== '이체/카드대금')
+    .reduce((a, b) => a + b.amount, 0);
+  const totalTransfer = reportTxs
+    .filter((t) => t.type === '이체/카드대금' || t.category === '이체/카드대금')
     .reduce((a, b) => a + b.amount, 0);
   const savingsRate =
     reportIncome > 0
@@ -1129,7 +1147,7 @@ ${bulkSmsText.trim()}
         .filter((t) => t.type === '수입')
         .reduce((a, b) => a + b.amount, 0);
       const exp = txs
-        .filter((t) => t.type === '지출')
+        .filter((t) => t.type === '지출' && t.category !== '이체/카드대금')
         .reduce((a, b) => a + b.amount, 0);
       result.push({
         year: y,
@@ -1137,6 +1155,7 @@ ${bulkSmsText.trim()}
         label: `${m}월`,
         income: inc,
         expense: exp,
+        surplus: inc - exp,
         isCurrent: offset === 0,
       });
     }
@@ -1152,11 +1171,47 @@ ${bulkSmsText.trim()}
       ? ((reportExpense - prevMonthExpense) / prevMonthExpense) * 100
       : null;
 
-  // 카테고리별 분석 (원형 도넛 그래프용 strokeDasharray 계산 포함)
+  // 금융자산(주식·ETF) 전월 대비 증감 및 등락률 계산
+  const stockMonthDiff = useMemo(() => {
+    return stocks.reduce((acc, st) => {
+      const prevPrice = st.prevMonthPrice || st.avgPrice || st.currentPrice;
+      const diff = (st.currentPrice - prevPrice) * (st.shares || 0);
+      return acc + diff;
+    }, 0);
+  }, [stocks]);
+
+  const stockMonthDiffRate = useMemo(() => {
+    const totalPrevEval = stocks.reduce((acc, st) => {
+      const prevPrice = st.prevMonthPrice || st.avgPrice || st.currentPrice;
+      return acc + prevPrice * (st.shares || 0);
+    }, 0);
+    return totalPrevEval > 0 ? (stockMonthDiff / totalPrevEval) * 100 : 0;
+  }, [stocks, stockMonthDiff]);
+
+  // 최근 6개월 순자산 변동 추이 (자동 연산)
+  const netWorthTrend = useMemo(() => {
+    const len = sixMonthTrend.length;
+    const history = new Array(len);
+    history[len - 1] = netWorth;
+    for (let i = len - 2; i >= 0; i--) {
+      const nextSurplus = sixMonthTrend[i + 1].surplus;
+      history[i] = history[i + 1] - (nextSurplus > 0 ? nextSurplus : 0);
+    }
+    return sixMonthTrend.map((item, idx) => ({
+      ...item,
+      netWorth: history[idx] || 0,
+    }));
+  }, [sixMonthTrend, netWorth]);
+
+  const latestNetDiff = netWorthTrend.length >= 2
+    ? netWorthTrend[netWorthTrend.length - 1].netWorth - netWorthTrend[netWorthTrend.length - 2].netWorth
+    : 0;
+
+  // 카테고리별 분석 (원형 도넛 그래프용 strokeDasharray 계산 포함 - 카드대금 제외)
   const categoryBreakdown = useMemo(() => {
     const map = {};
     reportTxs
-      .filter((t) => t.type === '지출')
+      .filter((t) => t.type === '지출' && t.category !== '이체/카드대금')
       .forEach((t) => {
         map[t.category] = (map[t.category] || 0) + t.amount;
       });
@@ -1791,6 +1846,69 @@ ${bulkSmsText.trim()}
               </div>
             </div>
 
+            {/* ★ [요청 기능] 월간 리포트 상단: 금융자산(주식·ETF) 전월 대비 손익 요약 카드 & 종목별 아코디언 */}
+            <div className="bg-gradient-to-r from-[#115e59] via-[#166553] to-[#047857] text-white rounded-2xl p-4 shadow-sm border border-emerald-600/40 flex flex-col gap-2.5">
+              <div className="flex justify-between items-center">
+                <div className="flex items-center gap-1.5">
+                  <TrendingUp size={16} className="text-emerald-300" />
+                  <span className="text-xs font-black text-white">📈 금융자산(주식·ETF) 전월 대비 변동</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setIsStockDetailOpen(!isStockDetailOpen)}
+                  className="text-[11px] bg-white/20 hover:bg-white/30 text-white font-black px-2.5 py-1 rounded-lg transition flex items-center gap-1"
+                >
+                  {isStockDetailOpen ? '종목별 닫기 ▲' : '종목별 상세 보기 ▼'}
+                </button>
+              </div>
+
+              <div className="flex justify-between items-end pt-0.5">
+                <div>
+                  <span className="text-[10px] text-emerald-200 block font-medium">지난달 대비 평가손익</span>
+                  <span className={`text-lg font-black tracking-tight ${stockMonthDiff >= 0 ? 'text-emerald-300' : 'text-blue-300'}`}>
+                    {stockMonthDiff >= 0 ? '+' : ''}{(stockMonthDiff / 10000).toFixed(1)}만원 ({stockMonthDiffRate >= 0 ? '+' : ''}{stockMonthDiffRate.toFixed(1)}%)
+                  </span>
+                </div>
+                <div className="text-right">
+                  <span className="text-[10px] text-emerald-200 block font-medium">주식 총 평가금액</span>
+                  <span className="text-sm font-extrabold text-white">
+                    {Math.round(stocks.reduce((acc, s) => acc + (s.shares || 0) * (s.currentPrice || s.avgPrice || 0), 0) / 10000).toLocaleString()}만원
+                  </span>
+                </div>
+              </div>
+
+              {/* 보유 종목별 아코디언 테이블 */}
+              {isStockDetailOpen && (
+                <div className="mt-2 pt-2.5 border-t border-white/20 flex flex-col gap-1.5">
+                  <div className="flex justify-between items-center text-[10px] text-emerald-200 font-bold px-1">
+                    <span>보유 종목명 (수량)</span>
+                    <span>전월가 대비 등락 (손익)</span>
+                  </div>
+                  {stocks.map((st) => {
+                    const prevPrice = st.prevMonthPrice || st.avgPrice || st.currentPrice;
+                    const diff = (st.currentPrice - prevPrice) * (st.shares || 0);
+                    const rate = prevPrice > 0 ? ((st.currentPrice - prevPrice) / prevPrice) * 100 : 0;
+                    return (
+                      <div key={st.id} className="flex justify-between items-center text-xs bg-black/25 px-2.5 py-2 rounded-xl border border-white/10">
+                        <div>
+                          <span className="font-bold text-white block">{st.name}</span>
+                          <span className="text-[10px] text-emerald-200 font-medium">{st.shares}주 보유</span>
+                        </div>
+                        <div className="text-right">
+                          <span className={`font-black text-xs block ${diff >= 0 ? 'text-emerald-300' : 'text-blue-300'}`}>
+                            {diff >= 0 ? '+' : ''}{(diff / 10000).toFixed(1)}만원 ({rate >= 0 ? '+' : ''}{rate.toFixed(1)}%)
+                          </span>
+                          <span className="text-[9px] text-white/60">
+                            현재 {st.currentPrice?.toLocaleString()}원
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
             {/* 3) 카테고리별 소비 비중 원형(도넛) 그래프 카드 */}
             <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100 flex flex-col gap-4">
               <div className="flex justify-between items-center">
@@ -1990,6 +2108,160 @@ ${bulkSmsText.trim()}
                 </span>
                 <span>{budgetProgress}%</span>
               </div>
+            </div>
+
+            {/* ★ [요청 위치] 최근 6개월 순자산 변동 추이 차트 (AI 코멘트 바로 위 위치) */}
+            <div className="bg-gradient-to-br from-[#166553] via-[#0f4d3f] to-[#0a352b] text-white rounded-2xl p-4 shadow-md flex flex-col gap-3">
+              <div className="flex justify-between items-start">
+                <div>
+                  <span className="text-[10px] uppercase tracking-wider text-emerald-200 font-extrabold block">
+                    Asset Growth Trend
+                  </span>
+                  <h3 className="text-sm font-black text-white flex items-center gap-1.5 mt-0.5">
+                    📈 순자산 성장 흐름 & 자산 변동
+                  </h3>
+                </div>
+                <div className="bg-white/15 px-2.5 py-0.5 rounded-full text-[11px] font-black text-emerald-100">
+                  총 순자산 {Math.round(netWorth / 10000).toLocaleString()}만원
+                </div>
+              </div>
+
+              {/* 전월비 순자산 및 주식 손익 요약 */}
+              <div className="grid grid-cols-2 gap-2 text-xs">
+                <div className="bg-white/10 backdrop-blur-sm rounded-xl p-2.5 flex flex-col justify-between border border-white/10">
+                  <span className="text-[10px] text-emerald-200 font-bold">전월비 순자산 변화</span>
+                  <span className="font-black text-white text-sm mt-1">
+                    {latestNetDiff >= 0 ? `+${(latestNetDiff / 10000).toFixed(0)}만원 🚀` : `-${Math.abs(latestNetDiff / 10000).toFixed(0)}만원`}
+                  </span>
+                </div>
+
+                <div className="bg-white/10 backdrop-blur-sm rounded-xl p-2.5 flex flex-col justify-between border border-white/10">
+                  <span className="text-[10px] text-emerald-200 font-bold">주식자산 전월비 변동</span>
+                  <span className={`font-black text-sm mt-1 ${stockMonthDiff >= 0 ? 'text-emerald-300' : 'text-blue-300'}`}>
+                    {stockMonthDiff >= 0 ? '+' : ''}{(stockMonthDiff / 10000).toFixed(1)}만원 ({stockMonthDiffRate >= 0 ? '+' : ''}{stockMonthDiffRate.toFixed(1)}%)
+                  </span>
+                </div>
+              </div>
+
+              {/* 토스/뱅크샐러드 스타일 곡선(Bezier) + 에메랄드 그라데이션 차트 + 인터랙티브 툴팁 */}
+              {(() => {
+                const minNet = Math.min(...netWorthTrend.map((n) => n.netWorth));
+                const maxNet = Math.max(...netWorthTrend.map((n) => n.netWorth));
+                const range = Math.max(100000, maxNet - minNet);
+
+                // 6개 포인트 (x, y) 좌표 계산 (viewBox: 0 0 320 120)
+                const pts = netWorthTrend.map((item, i) => {
+                  const x = 25 + i * 54;
+                  const ratio = range > 0 ? (item.netWorth - minNet) / range : 0.5;
+                  const y = 90 - ratio * 60; // y 범위: 30 ~ 90
+                  return { ...item, x, y, idx: i };
+                });
+
+                // 부드러운 Cubic Bezier 곡선 경로 생성
+                const pathD = pts.reduce((acc, p, i, a) => {
+                  if (i === 0) return `M ${p.x} ${p.y}`;
+                  const prev = a[i - 1];
+                  const cx1 = prev.x + (p.x - prev.x) / 2;
+                  const cy1 = prev.y;
+                  const cx2 = prev.x + (p.x - prev.x) / 2;
+                  const cy2 = p.y;
+                  return `${acc} C ${cx1} ${cy1}, ${cx2} ${cy2}, ${p.x} ${p.y}`;
+                }, '');
+
+                const areaD = `${pathD} L ${pts[pts.length - 1].x} 110 L ${pts[0].x} 110 Z`;
+                const curSel = pts[selectedTrendIndex] || pts[pts.length - 1];
+
+                return (
+                  <div className="bg-black/20 rounded-xl p-3 flex flex-col gap-1 border border-white/10">
+                    {/* 터치/클릭 시 반응하는 상세 정보 말풍선(툴팁 바) */}
+                    <div className="bg-emerald-950/60 border border-emerald-400/30 rounded-lg px-3 py-1.5 flex justify-between items-center text-xs">
+                      <span className="font-extrabold text-emerald-300">
+                        📌 {curSel.label} 순자산:
+                      </span>
+                      <div className="flex items-center gap-2">
+                        <span className="font-black text-white text-sm">
+                          {curSel.netWorth.toLocaleString()}원
+                        </span>
+                        <span className="text-[10px] text-emerald-200/90 font-medium">
+                          (잉여금 {curSel.surplus >= 0 ? '+' : ''}{(curSel.surplus / 10000).toFixed(0)}만)
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* 곡선 SVG 그래픽 영역 */}
+                    <div className="relative w-full h-32 pt-2">
+                      <svg viewBox="0 0 320 120" className="w-full h-full overflow-visible">
+                        <defs>
+                          <linearGradient id="emeraldAreaGradMain" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="0%" stopColor="#34d399" stopOpacity="0.4" />
+                            <stop offset="100%" stopColor="#34d399" stopOpacity="0.0" />
+                          </linearGradient>
+                        </defs>
+
+                        {/* 가로 보조선 */}
+                        <line x1="15" y1="30" x2="305" y2="30" stroke="rgba(255,255,255,0.08)" strokeDasharray="3 3" />
+                        <line x1="15" y1="60" x2="305" y2="60" stroke="rgba(255,255,255,0.08)" strokeDasharray="3 3" />
+                        <line x1="15" y1="90" x2="305" y2="90" stroke="rgba(255,255,255,0.08)" strokeDasharray="3 3" />
+
+                        {/* 부드러운 그라데이션 영역 */}
+                        <path d={areaD} fill="url(#emeraldAreaGradMain)" />
+
+                        {/* 메인 에메랄드 곡선 라인 */}
+                        <path d={pathD} fill="none" stroke="#34d399" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+
+                        {/* 각 월별 포인트 (터치/클릭 지원) */}
+                        {pts.map((p) => {
+                          const isSelected = selectedTrendIndex === p.idx;
+                          return (
+                            <g
+                              key={p.idx}
+                              className="cursor-pointer"
+                              onClick={() => setSelectedTrendIndex(p.idx)}
+                            >
+                              <circle cx={p.x} cy={p.y} r="14" fill="transparent" />
+                              {isSelected && (
+                                <circle cx={p.x} cy={p.y} r="8" fill="rgba(52, 211, 153, 0.3)" />
+                              )}
+                              <circle
+                                cx={p.x}
+                                cy={p.y}
+                                r={isSelected ? '5' : '3.5'}
+                                fill={isSelected ? '#ffffff' : '#34d399'}
+                                stroke={isSelected ? '#10b981' : '#ffffff'}
+                                strokeWidth="2"
+                              />
+                            </g>
+                          );
+                        })}
+                      </svg>
+                    </div>
+
+                    {/* 월별 라벨 (독립된 그리드 영역으로 글자 포개짐/겹침 원천 차단!) */}
+                    <div className="grid grid-cols-6 text-center pt-1 pb-1">
+                      {pts.map((p) => (
+                        <button
+                          key={p.idx}
+                          type="button"
+                          onClick={() => setSelectedTrendIndex(p.idx)}
+                          className={`text-[11px] font-black transition-all ${
+                            selectedTrendIndex === p.idx
+                              ? 'text-emerald-300 scale-110 font-black'
+                              : 'text-white/60 hover:text-white'
+                          }`}
+                        >
+                          {p.label}
+                        </button>
+                      ))}
+                    </div>
+
+                    {/* 하단 안내 설명문 (충분한 상단 여백 및 구분선으로 분리 배치) */}
+                    <div className="flex justify-between items-center text-[10px] text-emerald-200/80 pt-2 mt-1 border-t border-white/10 font-medium">
+                      <span>* 터치 시 해당 월 세부 지표 확인</span>
+                      <span>순잉여금 + 금융평가액 - 대출 반영</span>
+                    </div>
+                  </div>
+                );
+              })()}
             </div>
 
             {/* AI 소비 분석 코멘트 (Gemini 실시간 연동) */}
@@ -2612,23 +2884,26 @@ ${bulkSmsText.trim()}
               </div>
             )}
 
-            <div className="grid grid-cols-2 gap-2">
-              {['지출', '수입'].map((t) => (
-                <button
-                  type="button"
-                  key={t}
-                  onClick={() => setTxForm({ ...txForm, type: t })}
-                  className={`py-2 rounded-xl text-xs font-extrabold ${
-                    txForm.type === t
-                      ? t === '지출'
-                        ? 'bg-red-500 text-white'
-                        : 'bg-emerald-600 text-white'
-                      : 'bg-gray-100 text-gray-500'
-                  }`}
-                >
-                  {t}
-                </button>
-              ))}
+            <div>
+              <label className="font-extrabold text-gray-700 block mb-1 text-xs">거래 유형</label>
+              <div className="grid grid-cols-3 gap-1.5">
+                {[
+                  { type: '지출', label: '지출', color: 'bg-red-500 text-white' },
+                  { type: '수입', label: '수입', color: 'bg-emerald-600 text-white' },
+                  { type: '이체/카드대금', label: '💳 카드대금', color: 'bg-indigo-600 text-white' },
+                ].map((t) => (
+                  <button
+                    type="button"
+                    key={t.type}
+                    onClick={() => setTxForm({ ...txForm, type: t.type })}
+                    className={`py-2 rounded-xl text-xs font-extrabold transition ${
+                      txForm.type === t.type ? t.color : 'bg-gray-100 text-gray-500'
+                    }`}
+                  >
+                    {t.label}
+                  </button>
+                ))}
+              </div>
             </div>
             <input
               type="date"
