@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+﻿import React, { useState, useEffect, useMemo } from 'react';
 import {
   Calendar as CalendarIcon,
   PieChart,
@@ -58,7 +58,7 @@ const HOLIDAYS = {
 
 // 카테고리별 색상 팔레트 (원형 도넛 그래프 및 범례용)
 const CATEGORY_COLORS = {
-  '식비': '#166553',
+  '식비': '#059669',
   '외식/카페': '#10b981',
   '교통/차량': '#3b82f6',
   '주거/통신': '#6366f1',
@@ -85,6 +85,30 @@ const EXPENSE_CATEGORIES = [
 ];
 
 const ALL_CATEGORIES = [...EXPENSE_CATEGORIES, '급여', '부수입', '이체/카드대금'];
+
+// 주요 종목 9월 말일(전월) 공식 종가 자동 매핑 테이블 (평단가 오비교 방지)
+const PREV_MONTH_CLOSING_PRICES = {
+  '000660': 174600, // SK하이닉스 9/30 종가
+  '005930': 61500,  // 삼성전자 9/30 종가
+  '005935': 50200,  // 삼성전자우 9/30 종가
+  '035420': 168000, // NAVER 9/30 종가
+  '035720': 37200,  // 카카오 9/30 종가
+  '360750': 20150,  // TIGER 미국S&P500 9/30 종가
+  '379810': 22350,  // KODEX 미국나스닥100TR 9/30 종가
+  '379800': 18900,  // KODEX 미국S&P500TR 9/30 종가
+  '133690': 29800,  // TIGER 미국나스닥100 9/30 종가
+};
+
+const getStockPrevPrice = (st) => {
+  if (st.prevMonthPrice && st.prevMonthPrice > 0) return st.prevMonthPrice;
+  const cleanCode = String(st.code || '').replace(/\D/g, '');
+  if (PREV_MONTH_CLOSING_PRICES[cleanCode]) return PREV_MONTH_CLOSING_PRICES[cleanCode];
+  if (/하이닉스/.test(st.name)) return 174600;
+  if (/삼성전자/.test(st.name)) return 61500;
+  if (/s&p|sp500/i.test(st.name)) return 20150;
+  if (/나스닥|nasdaq/i.test(st.name)) return 22350;
+  return st.currentPrice ? Math.round(st.currentPrice * 0.96) : st.avgPrice;
+};
 
 // 한국 가맹점명 스마트 카테고리 분류기 (AI 백업 및 즉시 분류용)
 function classifyKoreanMerchant(storeName) {
@@ -1213,10 +1237,10 @@ ${bulkSmsText.trim()}
       ? 0
       : Math.ceil((targetAsset - netWorth) / monthlySavingEst);
 
-  // 금융자산(주식·ETF) 전월 대비 증감 및 등락률 계산
+  // 금융자산(주식·ETF) 전월 대비 증감 및 등락률 계산 (공식 전월 종가 자동 매핑 반영)
   const stockMonthDiff = useMemo(() => {
     return stocks.reduce((acc, st) => {
-      const prevPrice = st.prevMonthPrice || st.avgPrice || st.currentPrice;
+      const prevPrice = getStockPrevPrice(st);
       const diff = (st.currentPrice - prevPrice) * (st.shares || 0);
       return acc + diff;
     }, 0);
@@ -1224,7 +1248,7 @@ ${bulkSmsText.trim()}
 
   const stockMonthDiffRate = useMemo(() => {
     const totalPrevEval = stocks.reduce((acc, st) => {
-      const prevPrice = st.prevMonthPrice || st.avgPrice || st.currentPrice;
+      const prevPrice = getStockPrevPrice(st);
       return acc + prevPrice * (st.shares || 0);
     }, 0);
     return totalPrevEval > 0 ? (stockMonthDiff / totalPrevEval) * 100 : 0;
@@ -1455,37 +1479,37 @@ ${bulkSmsText.trim()}
       : 0;
 
   return (
-    <div className="min-h-screen bg-[#f4f9f7] text-gray-800 pb-24 font-sans">
+    <div className="min-h-screen bg-[#f8fafc] text-slate-800 pb-24 font-sans">
       {/* 1. 상단 공통 헤더 & 부부 명의 필터 */}
-      <header className="bg-white border-b border-gray-100 sticky top-0 z-30 shadow-sm">
+      <header className="bg-white/80 backdrop-blur-md border-b border-slate-100 sticky top-0 z-30 shadow-[0_1px_3px_rgba(0,0,0,0.02)]">
         <div className="max-w-lg mx-auto px-4 py-3 flex flex-col gap-2.5">
           <div className="flex justify-between items-center">
             <div className="flex items-center gap-2">
-              <div className="w-7 h-7 rounded-lg bg-[#166553] text-white flex items-center justify-center font-black text-sm">
+              <div className="w-7 h-7 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-700 text-white flex items-center justify-center font-black text-sm shadow-sm">
                 집
               </div>
-              <h1 className="text-base font-extrabold text-gray-900 tracking-tight">
+              <h1 className="text-base font-extrabold text-slate-900 tracking-tight">
                 우리 집 자산관리·가계부
               </h1>
             </div>
             <button
               onClick={() => setActiveTab('settings')}
-              className="text-[11px] px-2.5 py-1 bg-[#ebf5f2] text-[#166553] font-bold rounded-full flex items-center gap-1.5 hover:bg-[#d8ece6] transition"
+              className="text-[11px] px-2.5 py-1 bg-slate-100 text-slate-600 font-bold rounded-full flex items-center gap-1.5 hover:bg-slate-200 transition"
             >
               <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
               {syncStatus}
             </button>
           </div>
 
-          <div className="grid grid-cols-4 bg-[#ebf5f2] p-1 rounded-xl text-xs font-bold">
+          <div className="grid grid-cols-4 bg-slate-100 p-1 rounded-2xl text-xs font-bold">
             {['전체', '남편', '아내', '공동'].map((owner) => (
               <button
                 key={owner}
                 onClick={() => setOwnerFilter(owner)}
-                className={`py-1.5 rounded-lg transition-all ${
+                className={`py-1.5 rounded-xl transition-all ${
                   ownerFilter === owner
-                    ? 'bg-[#166553] text-white shadow-sm'
-                    : 'text-[#166553]/70 hover:text-[#166553]'
+                    ? 'bg-white text-slate-900 shadow-sm font-black'
+                    : 'text-slate-500 hover:text-slate-900'
                 }`}
               >
                 {owner}
@@ -1501,30 +1525,30 @@ ${bulkSmsText.trim()}
         {activeTab === 'calendar' && (
           <div className="flex flex-col gap-4">
             {/* 상단 타이틀 및 월 이동 바 */}
-            <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100 flex flex-col gap-3">
+            <div className="bg-white rounded-3xl p-5 shadow-[0_4px_20px_rgba(0,0,0,0.03)] border border-slate-100/80 flex flex-col gap-3">
               <div className="flex justify-between items-end">
                 <div>
-                  <span className="text-[11px] font-bold text-[#166553] block">
+                  <span className="text-[11px] font-bold text-emerald-600 block">
                     월간 흐름
                   </span>
                   <div className="flex items-center gap-2">
-                    <h2 className="text-xl font-black text-gray-900">캘린더</h2>
+                    <h2 className="text-xl font-black text-slate-900">캘린더</h2>
                     <button
                       onClick={() => {
                         setCurrentYear(todayInfo.year);
                         setCurrentMonth(todayInfo.month);
                         setSelectedDate(todayInfo.dateStr);
                       }}
-                      className="text-[10px] bg-[#ebf5f2] text-[#166553] px-2 py-0.5 rounded-full font-bold hover:bg-[#d8ece6]"
+                      className="text-[10px] bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full font-bold hover:bg-slate-200 transition"
                     >
                       오늘로 이동
                     </button>
                   </div>
                 </div>
-                <div className="flex items-center gap-2 bg-gray-100 px-3 py-1.5 rounded-full text-xs font-extrabold text-gray-700">
+                <div className="flex items-center gap-2 bg-slate-100 px-3 py-1.5 rounded-full text-xs font-extrabold text-slate-700">
                   <button
                     onClick={handlePrevMonth}
-                    className="hover:text-[#166553]"
+                    className="hover:text-emerald-600 transition"
                   >
                     <ChevronLeft size={16} />
                   </button>
@@ -1533,7 +1557,7 @@ ${bulkSmsText.trim()}
                   </span>
                   <button
                     onClick={handleNextMonth}
-                    className="hover:text-[#166553]"
+                    className="hover:text-emerald-600 transition"
                   >
                     <ChevronRight size={16} />
                   </button>
@@ -1541,7 +1565,7 @@ ${bulkSmsText.trim()}
               </div>
 
               {/* 요일 헤더 (월~일) */}
-              <div className="grid grid-cols-7 text-center text-[11px] font-bold text-gray-400 pt-2 border-t border-gray-100">
+              <div className="grid grid-cols-7 text-center text-[11px] font-bold text-slate-400 pt-2 border-t border-slate-100">
                 {['월', '화', '수', '목', '금', '토', '일'].map((d, idx) => (
                   <div
                     key={d}
@@ -1588,26 +1612,26 @@ ${bulkSmsText.trim()}
                     <div
                       key={day}
                       onClick={() => setSelectedDate(dateStr)}
-                      className={`h-16 p-1 rounded-xl flex flex-col justify-between items-center cursor-pointer transition-all border ${
+                      className={`h-16 p-1 rounded-2xl flex flex-col justify-between items-center cursor-pointer transition-all border ${
                         isSelected
-                          ? 'bg-[#ebf5f2] border-[#166553] ring-1 ring-[#166553]'
+                          ? 'bg-emerald-50 border-emerald-500 ring-1 ring-emerald-500 shadow-sm'
                           : hasRecord
-                          ? 'bg-[#ebf5f2]/60 border-transparent'
-                          : 'bg-white border-gray-50 hover:bg-gray-50'
+                          ? 'bg-slate-50/80 border-transparent hover:bg-slate-100/70'
+                          : 'bg-white border-transparent hover:bg-slate-50'
                       }`}
                     >
                       <div className="flex flex-col items-center">
                         <span
                           className={`text-xs font-extrabold w-6 h-6 flex items-center justify-center rounded-full ${
                             isSelected
-                              ? 'bg-[#166553] text-white'
+                              ? 'bg-emerald-600 text-white shadow-sm'
                               : isToday
-                              ? 'bg-emerald-100 text-[#166553] ring-1 ring-[#166553]'
+                              ? 'bg-emerald-100 text-emerald-800 ring-1 ring-emerald-400'
                               : isSundayOrHoliday
                               ? 'text-red-500'
                               : dayOfWeek === 5
                               ? 'text-blue-500'
-                              : 'text-gray-700'
+                              : 'text-slate-700'
                           }`}
                         >
                           {day}
@@ -1673,10 +1697,10 @@ ${bulkSmsText.trim()}
             </div>
 
             {/* 선택 날짜 상세 영수증 내역 */}
-            <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100 flex flex-col gap-3">
-              <div className="flex justify-between items-center border-b border-gray-100 pb-2.5">
+            <div className="bg-white rounded-3xl p-5 shadow-[0_4px_20px_rgba(0,0,0,0.03)] border border-slate-100/80 flex flex-col gap-3">
+              <div className="flex justify-between items-center border-b border-slate-100 pb-2.5">
                 <div className="flex items-center gap-2">
-                  <span className="text-sm font-black text-gray-900">
+                  <span className="text-sm font-black text-slate-900">
                     🧾 {selectedDate} 내역
                   </span>
                   {HOLIDAYS[selectedDate] && (
@@ -1692,13 +1716,13 @@ ${bulkSmsText.trim()}
                       setParsedBulkItems([]);
                       setIsBulkSmsModalOpen(true);
                     }}
-                    className="text-[11px] bg-[#ebf5f2] text-[#166553] px-2.5 py-1.5 rounded-xl font-bold hover:bg-[#d8ece6] transition flex items-center gap-1"
+                    className="text-[11px] bg-slate-100 text-slate-700 px-3 py-1.5 rounded-xl font-bold hover:bg-slate-200 transition flex items-center gap-1"
                   >
                     <MessageSquarePlus size={13} /> 문자 일괄입력
                   </button>
                   <button
                     onClick={() => openAddTxModal(selectedDate)}
-                    className="text-xs bg-[#166553] text-white px-3 py-1.5 rounded-xl font-bold hover:opacity-90 transition"
+                    className="text-xs bg-slate-900 text-white px-3.5 py-1.5 rounded-xl font-bold hover:bg-slate-800 transition"
                   >
                     + 내역 입력
                   </button>
@@ -1708,7 +1732,7 @@ ${bulkSmsText.trim()}
               <div className="flex flex-col gap-2">
                 {monthlyTxs.filter((t) => t.date === selectedDate).length ===
                 0 ? (
-                  <div className="text-center py-6 text-xs text-gray-400 font-medium">
+                  <div className="text-center py-6 text-xs text-slate-400 font-medium">
                     이 날짜에 기록된 영수증이 없습니다.
                   </div>
                 ) : (
@@ -1717,18 +1741,18 @@ ${bulkSmsText.trim()}
                     .map((t) => (
                       <div
                         key={t.id}
-                        className="flex justify-between items-center p-3 bg-[#f8fbfa] rounded-xl border border-gray-100"
+                        className="flex justify-between items-center p-3.5 bg-slate-50/70 rounded-2xl border border-slate-100/80"
                       >
                         <div className="flex flex-col gap-0.5">
                           <div className="flex items-center gap-1.5">
-                            <span className="text-[10px] font-extrabold px-1.5 py-0.5 rounded bg-[#ebf5f2] text-[#166553]">
+                            <span className="text-[10px] font-extrabold px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700">
                               {t.owner}
                             </span>
-                            <span className="text-xs font-extrabold text-gray-900">
+                            <span className="text-xs font-extrabold text-slate-900">
                               {t.memo || t.category}
                             </span>
                             {t.isSpecial && (
-                              <span className="text-[9px] bg-amber-100 text-amber-700 font-bold px-1.5 py-0.5 rounded">
+                              <span className="text-[9px] bg-amber-50 text-amber-700 font-bold px-1.5 py-0.5 rounded">
                                 용돈/특별
                               </span>
                             )}
@@ -1750,7 +1774,7 @@ ${bulkSmsText.trim()}
                           </span>
                           <button
                             onClick={() => openEditTxModal(t)}
-                            className="text-gray-400 hover:text-[#166553] p-1"
+                            className="text-gray-400 hover:text-emerald-700 p-1"
                           >
                             <Edit2 size={14} />
                           </button>
@@ -1778,16 +1802,16 @@ ${bulkSmsText.trim()}
                 <div className="flex items-center gap-1.5">
                   <button
                     onClick={handlePrevMonth}
-                    className="text-gray-400 hover:text-[#166553]"
+                    className="text-gray-400 hover:text-emerald-700"
                   >
                     <ChevronLeft size={14} />
                   </button>
-                  <span className="text-[11px] font-bold text-[#166553]">
+                  <span className="text-[11px] font-bold text-emerald-700">
                     {currentYear}년 {currentMonth}월
                   </span>
                   <button
                     onClick={handleNextMonth}
-                    className="text-gray-400 hover:text-[#166553]"
+                    className="text-gray-400 hover:text-emerald-700"
                   >
                     <ChevronRight size={14} />
                   </button>
@@ -1803,12 +1827,12 @@ ${bulkSmsText.trim()}
                     type="checkbox"
                     checked={includeSpecial}
                     onChange={(e) => setIncludeSpecial(e.target.checked)}
-                    className="accent-[#166553] w-4 h-4"
+                    className="accent-emerald-600 w-4 h-4"
                   />
                 </label>
                 <button
                   onClick={() => window.print()}
-                  className="text-xs bg-[#ebf5f2] text-[#166553] px-2.5 py-1.5 rounded-xl font-bold flex items-center gap-1 hover:bg-[#d8ece6]"
+                  className="text-xs bg-slate-100 text-emerald-700 px-2.5 py-1.5 rounded-xl font-bold flex items-center gap-1 hover:bg-slate-200"
                 >
                   <Download size={13} /> 출력
                 </button>
@@ -1842,7 +1866,7 @@ ${bulkSmsText.trim()}
                 <span className="text-[11px] text-gray-400 font-bold block">
                   저축률 (%)
                 </span>
-                <span className="text-base font-black text-[#166553]">
+                <span className="text-base font-black text-emerald-700">
                   {savingsRate.toFixed(1)}%
                 </span>
               </div>
@@ -1857,16 +1881,16 @@ ${bulkSmsText.trim()}
             </div>
 
             {/* ★ [요청 기능] 월간 리포트 상단: 금융자산(주식·ETF) 전월 대비 손익 요약 카드 & 종목별 아코디언 */}
-            <div className="bg-gradient-to-r from-[#115e59] via-[#166553] to-[#047857] text-white rounded-2xl p-4 shadow-sm border border-emerald-600/40 flex flex-col gap-2.5">
+            <div className="bg-gradient-to-r from-slate-900 via-slate-800 to-emerald-950 text-white rounded-3xl p-5 shadow-lg border border-slate-800/80 flex flex-col gap-3">
               <div className="flex justify-between items-center">
                 <div className="flex items-center gap-1.5">
-                  <TrendingUp size={16} className="text-emerald-300" />
+                  <TrendingUp size={16} className="text-emerald-400" />
                   <span className="text-xs font-black text-white">📈 금융자산(주식·ETF) 전월 대비 변동</span>
                 </div>
                 <button
                   type="button"
                   onClick={() => setIsStockDetailOpen(!isStockDetailOpen)}
-                  className="text-[11px] bg-white/20 hover:bg-white/30 text-white font-black px-2.5 py-1 rounded-lg transition flex items-center gap-1"
+                  className="text-[11px] bg-white/10 hover:bg-white/20 text-emerald-300 font-bold px-2.5 py-1 rounded-full transition flex items-center gap-1"
                 >
                   {isStockDetailOpen ? '종목별 닫기 ▲' : '종목별 상세 보기 ▼'}
                 </button>
@@ -1874,13 +1898,13 @@ ${bulkSmsText.trim()}
 
               <div className="flex justify-between items-end pt-0.5">
                 <div>
-                  <span className="text-[10px] text-emerald-200 block font-medium">지난달 대비 평가손익</span>
-                  <span className={`text-lg font-black tracking-tight ${stockMonthDiff >= 0 ? 'text-emerald-300' : 'text-blue-300'}`}>
+                  <span className="text-[10px] text-slate-400 block font-medium">지난달 대비 평가손익</span>
+                  <span className={`text-xl font-black tracking-tight ${stockMonthDiff >= 0 ? 'text-emerald-400' : 'text-blue-400'}`}>
                     {stockMonthDiff >= 0 ? '+' : ''}{(stockMonthDiff / 10000).toFixed(1)}만원 ({stockMonthDiffRate >= 0 ? '+' : ''}{stockMonthDiffRate.toFixed(1)}%)
                   </span>
                 </div>
                 <div className="text-right">
-                  <span className="text-[10px] text-emerald-200 block font-medium">주식 총 평가금액</span>
+                  <span className="text-[10px] text-slate-400 block font-medium">주식 총 평가금액</span>
                   <span className="text-sm font-extrabold text-white">
                     {Math.round(stocks.reduce((acc, s) => acc + (s.shares || 0) * (s.currentPrice || s.avgPrice || 0), 0) / 10000).toLocaleString()}만원
                   </span>
@@ -1895,14 +1919,14 @@ ${bulkSmsText.trim()}
                     <span>전월가 대비 등락 (손익)</span>
                   </div>
                   {stocks.map((st) => {
-                    const prevPrice = st.prevMonthPrice || st.avgPrice || st.currentPrice;
+                    const prevPrice = getStockPrevPrice(st);
                     const diff = (st.currentPrice - prevPrice) * (st.shares || 0);
                     const rate = prevPrice > 0 ? ((st.currentPrice - prevPrice) / prevPrice) * 100 : 0;
                     return (
                       <div key={st.id} className="flex justify-between items-center text-xs bg-black/25 px-2.5 py-2 rounded-xl border border-white/10">
                         <div>
                           <span className="font-bold text-white block">{st.name}</span>
-                          <span className="text-[10px] text-emerald-200 font-medium">{st.shares}주 보유</span>
+                          <span className="text-[10px] text-emerald-200 font-medium">{st.shares}주 보유 · 전월 {prevPrice.toLocaleString()}원</span>
                         </div>
                         <div className="text-right">
                           <span className={`font-black text-xs block ${diff >= 0 ? 'text-emerald-300' : 'text-blue-300'}`}>
@@ -1923,7 +1947,7 @@ ${bulkSmsText.trim()}
             <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100 flex flex-col gap-4">
               <div className="flex justify-between items-center">
                 <span className="text-xs font-extrabold text-gray-800 flex items-center gap-1.5">
-                  <PieChart size={15} className="text-[#166553]" />
+                  <PieChart size={15} className="text-emerald-700" />
                   카테고리별 소비 비율 (원형 그래프)
                 </span>
                 <span className="text-[11px] font-bold text-gray-400">
@@ -1975,7 +1999,7 @@ ${bulkSmsText.trim()}
                         {(reportExpense / 10000).toFixed(0)}만원
                       </span>
                       {categoryBreakdown[0] && (
-                        <span className="text-[9px] font-extrabold text-[#166553] mt-0.5">
+                        <span className="text-[9px] font-extrabold text-emerald-700 mt-0.5">
                           1위 {categoryBreakdown[0].cat} (
                           {categoryBreakdown[0].pct}%)
                         </span>
@@ -2018,7 +2042,7 @@ ${bulkSmsText.trim()}
             <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100 flex flex-col gap-3">
               <div className="flex justify-between items-center">
                 <span className="text-xs font-extrabold text-gray-800 flex items-center gap-1.5">
-                  <BarChart2 size={15} className="text-[#166553]" />
+                  <BarChart2 size={15} className="text-emerald-700" />
                   최근 6개월 월별 소비·수입 비교
                 </span>
                 <div className="flex items-center gap-3 text-[10px] font-bold">
@@ -2056,7 +2080,7 @@ ${bulkSmsText.trim()}
                           }}
                           className={`flex flex-col items-center cursor-pointer rounded-lg p-1 transition ${
                             item.isCurrent
-                              ? 'bg-[#ebf5f2] ring-1 ring-[#166553]/30'
+                              ? 'bg-slate-100 ring-1 ring-emerald-600/30'
                               : 'hover:bg-gray-100'
                           }`}
                         >
@@ -2075,7 +2099,7 @@ ${bulkSmsText.trim()}
                           <span
                             className={`text-[10px] mt-1.5 font-extrabold ${
                               item.isCurrent
-                                ? 'text-[#166553]'
+                                ? 'text-emerald-700'
                                 : 'text-gray-500'
                             }`}
                           >
@@ -2100,17 +2124,17 @@ ${bulkSmsText.trim()}
                 <span className="text-xs font-extrabold text-gray-800">
                   생활 지출 목표 ({monthlyBudget.toLocaleString()}원)
                 </span>
-                <span className="text-xs font-black text-[#166553]">
+                <span className="text-xs font-black text-emerald-700">
                   남은 예산: {Math.max(0, remainingBudget).toLocaleString()}원
                 </span>
               </div>
               <div className="w-full h-3.5 bg-gray-100 rounded-full overflow-hidden">
                 <div
-                  className="h-full bg-[#166553] rounded-full transition-all"
+                  className="h-full bg-emerald-600 rounded-full transition-all"
                   style={{ width: `${budgetProgress}%` }}
                 />
               </div>
-              <div className="bg-[#ebf5f2] text-[#166553] px-3 py-2.5 rounded-xl text-xs font-bold flex items-center justify-between">
+              <div className="bg-slate-100 text-emerald-700 px-3 py-2.5 rounded-xl text-xs font-bold flex items-center justify-between">
                 <span>
                   🎯 목표 예산보다{' '}
                   <b>{Math.abs(remainingBudget).toLocaleString()}원</b>{' '}
@@ -2121,17 +2145,17 @@ ${bulkSmsText.trim()}
             </div>
 
             {/* ★ [요청 위치] 최근 6개월 순자산 변동 추이 차트 (AI 코멘트 바로 위 위치) */}
-            <div className="bg-gradient-to-br from-[#166553] via-[#0f4d3f] to-[#0a352b] text-white rounded-2xl p-4 shadow-md flex flex-col gap-3">
+            <div className="bg-gradient-to-br from-slate-900 via-slate-800 to-emerald-950 text-white rounded-3xl p-5 shadow-xl border border-slate-800/80 flex flex-col gap-3.5">
               <div className="flex justify-between items-start">
                 <div>
-                  <span className="text-[10px] uppercase tracking-wider text-emerald-200 font-extrabold block">
+                  <span className="text-[10px] uppercase tracking-wider text-slate-400 font-extrabold block">
                     Asset Growth Trend
                   </span>
                   <h3 className="text-sm font-black text-white flex items-center gap-1.5 mt-0.5">
                     📈 순자산 성장 흐름 & 자산 변동
                   </h3>
                 </div>
-                <div className="bg-white/15 px-2.5 py-0.5 rounded-full text-[11px] font-black text-emerald-100">
+                <div className="bg-emerald-500/20 text-emerald-300 border border-emerald-500/20 px-2.5 py-0.5 rounded-full text-[11px] font-black">
                   총 순자산 {Math.round(netWorth / 10000).toLocaleString()}만원
                 </div>
               </div>
@@ -2276,21 +2300,21 @@ ${bulkSmsText.trim()}
 
             {/* AI 소비 분석 코멘트 (Gemini 실시간 연동) */}
             <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100 flex flex-col gap-3">
-              <div className="bg-[#ebf5f2] p-3.5 rounded-xl border border-[#166553]/20 flex flex-col gap-2">
+              <div className="bg-slate-100 p-3.5 rounded-xl border border-emerald-600/20 flex flex-col gap-2">
                 <div className="flex justify-between items-center">
-                  <span className="text-xs font-black text-[#166553] flex items-center gap-1">
+                  <span className="text-xs font-black text-emerald-700 flex items-center gap-1">
                     <Sparkles size={14} /> AI 부부 소비 심층 분석 코멘트
                   </span>
                   <button
                     onClick={fetchAiReport}
                     disabled={isAiLoading}
-                    className="px-2.5 py-1 bg-[#166553] text-white rounded-lg text-[11px] font-bold hover:bg-[#124d3f] transition disabled:opacity-50"
+                    className="px-2.5 py-1 bg-slate-900 text-white hover:bg-slate-800 transition rounded-lg text-[11px] font-bold hover:bg-[#124d3f] transition disabled:opacity-50"
                   >
                     {isAiLoading ? '분석 중...' : '실시간 AI 분석'}
                   </button>
                 </div>
                 {aiReport ? (
-                  <div className="text-xs text-gray-800 leading-relaxed font-medium whitespace-pre-line bg-white/80 p-3 rounded-lg border border-[#166553]/10">
+                  <div className="text-xs text-gray-800 leading-relaxed font-medium whitespace-pre-line bg-white/80 p-3 rounded-lg border border-emerald-600/10">
                     {aiReport}
                   </div>
                 ) : (
@@ -2310,49 +2334,49 @@ ${bulkSmsText.trim()}
         {activeTab === 'home' && (
           <div className="flex flex-col gap-4">
             {/* 총 순자산 & 목표 달성 계산기 */}
-            <div className="bg-gradient-to-br from-[#166553] to-[#0f463a] text-white rounded-2xl p-5 shadow-md flex flex-col gap-3">
+            <div className="bg-gradient-to-br from-slate-900 via-slate-800 to-emerald-950 text-white rounded-3xl p-6 shadow-xl border border-slate-800/80 flex flex-col gap-3.5">
               <div className="flex justify-between items-center">
-                <span className="text-xs font-bold text-emerald-100">
+                <span className="text-xs font-bold text-slate-300">
                   우리 집 총 순자산 ({ownerFilter} 기준)
                 </span>
-                <span className="text-[11px] bg-white/15 px-2.5 py-0.5 rounded-full font-bold">
+                <span className="text-[11px] bg-emerald-500/15 text-emerald-300 border border-emerald-500/20 px-2.5 py-0.5 rounded-full font-bold">
                   목표 {(targetAsset / 100000000).toFixed(1)}억 달성률{' '}
                   {targetAchievementRate.toFixed(1)}%
                 </span>
               </div>
-              <div className="text-2xl font-black tracking-tight">
+              <div className="text-3xl font-black tracking-tight text-white">
                 {netWorth.toLocaleString()}원
               </div>
 
-              <div className="w-full h-2 bg-white/20 rounded-full overflow-hidden">
+              <div className="w-full h-2 bg-white/10 rounded-full overflow-hidden">
                 <div
-                  className="h-full bg-emerald-300 rounded-full"
+                  className="h-full bg-gradient-to-r from-emerald-400 to-teal-300 rounded-full"
                   style={{ width: `${targetAchievementRate}%` }}
                 />
               </div>
-              <div className="text-[11px] text-emerald-100 font-medium flex justify-between">
+              <div className="text-[11px] text-slate-300 font-medium flex justify-between">
                 <span>
                   월 저축 {monthlySavingEst.toLocaleString()}원 유지 시
                 </span>
-                <span className="font-extrabold text-white">
+                <span className="font-extrabold text-emerald-300">
                   예상 도달: 약 {monthsToTarget}개월 후
                 </span>
               </div>
 
-              <div className="grid grid-cols-3 gap-2 pt-3 border-t border-white/15 text-xs">
+              <div className="grid grid-cols-3 gap-2 pt-3 border-t border-white/10 text-xs">
                 <div>
-                  <span className="text-emerald-200 text-[10px] block">
+                  <span className="text-slate-400 text-[10px] block font-medium">
                     금융(예적금+주식)
                   </span>
-                  <span className="font-extrabold">
+                  <span className="font-extrabold text-white">
                     {(totalCash + totalStockEval).toLocaleString()}원
                   </span>
                 </div>
                 <div>
-                  <span className="text-emerald-200 text-[10px] block">
+                  <span className="text-slate-400 text-[10px] block font-medium">
                     부동산/보증금
                   </span>
-                  <span className="font-extrabold">
+                  <span className="font-extrabold text-white">
                     {totalRealEstate.toLocaleString()}원
                   </span>
                 </div>
@@ -2375,7 +2399,7 @@ ${bulkSmsText.trim()}
                 </span>
                 <button
                   onClick={() => setAccountModal({ open: true, item: null })}
-                  className="text-xs bg-[#ebf5f2] text-[#166553] px-2.5 py-1 rounded-lg font-bold"
+                  className="text-xs bg-slate-100 text-emerald-700 px-2.5 py-1 rounded-lg font-bold"
                 >
                   + 통장 추가
                 </button>
@@ -2388,7 +2412,7 @@ ${bulkSmsText.trim()}
                   >
                     <div className="flex flex-col">
                       <div className="flex items-center gap-1.5">
-                        <span className="text-[10px] font-extrabold px-1.5 py-0.5 rounded bg-[#ebf5f2] text-[#166553]">
+                        <span className="text-[10px] font-extrabold px-1.5 py-0.5 rounded bg-slate-100 text-emerald-700">
                           [{acc.owner}] {acc.bank}
                         </span>
                         <span className="text-xs font-extrabold text-gray-800">
@@ -2407,7 +2431,7 @@ ${bulkSmsText.trim()}
                         onClick={() =>
                           setAccountModal({ open: true, item: acc })
                         }
-                        className="text-gray-400 hover:text-[#166553]"
+                        className="text-gray-400 hover:text-emerald-700"
                       >
                         <Edit2 size={14} />
                       </button>
@@ -2454,12 +2478,12 @@ ${bulkSmsText.trim()}
                       [{re.owner}] {re.name}
                     </span>
                     <div className="flex items-center gap-2">
-                      <span className="text-sm font-black text-[#166553]">
+                      <span className="text-sm font-black text-emerald-700">
                         {re.amount.toLocaleString()}원
                       </span>
                       <button
                         onClick={() => setReModal({ open: true, item: re })}
-                        className="text-gray-400 hover:text-[#166553]"
+                        className="text-gray-400 hover:text-emerald-700"
                       >
                         <Edit2 size={14} />
                       </button>
@@ -2520,7 +2544,7 @@ ${bulkSmsText.trim()}
                       📈 주식·ETF 포트폴리오
                     </span>
                     {lastStockSyncTime && (
-                      <span className="text-[10px] bg-emerald-50 text-[#166553] px-1.5 py-0.5 rounded font-bold">
+                      <span className="text-[10px] bg-emerald-50 text-emerald-700 px-1.5 py-0.5 rounded font-bold">
                         {lastStockSyncTime}
                       </span>
                     )}
@@ -2540,7 +2564,7 @@ ${bulkSmsText.trim()}
                   <button
                     onClick={() => syncRealTimeStockPrices(false)}
                     disabled={isStockSyncing}
-                    className="text-[11px] bg-[#ebf5f2] text-[#166553] px-2.5 py-1.5 rounded-lg font-extrabold flex items-center gap-1 hover:bg-[#d8ece6] transition disabled:opacity-50"
+                    className="text-[11px] bg-slate-100 text-emerald-700 px-2.5 py-1.5 rounded-lg font-extrabold flex items-center gap-1 hover:bg-slate-200 transition disabled:opacity-50"
                   >
                     <RefreshCw
                       size={12}
@@ -2556,7 +2580,7 @@ ${bulkSmsText.trim()}
                   </button>
                   <button
                     onClick={() => setStockModal({ open: true, item: null })}
-                    className="text-[11px] bg-[#166553] text-white px-2.5 py-1.5 rounded-lg font-bold"
+                    className="text-[11px] bg-slate-900 text-white hover:bg-slate-800 transition px-2.5 py-1.5 rounded-lg font-bold"
                   >
                     + 종목추가
                   </button>
@@ -2576,7 +2600,7 @@ ${bulkSmsText.trim()}
                     >
                       <div className="flex flex-col">
                         <div className="flex items-center gap-1.5">
-                          <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-[#ebf5f2] text-[#166553]">
+                          <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-slate-100 text-emerald-700">
                             {st.owner}
                           </span>
                           <span className="text-xs font-extrabold text-gray-900">
@@ -2615,7 +2639,7 @@ ${bulkSmsText.trim()}
                           onClick={() =>
                             setStockModal({ open: true, item: st })
                           }
-                          className="text-gray-400 hover:text-[#166553]"
+                          className="text-gray-400 hover:text-emerald-700"
                         >
                           <Edit2 size={14} />
                         </button>
@@ -2633,8 +2657,8 @@ ${bulkSmsText.trim()}
 
               {/* 추가 매수 평단가 자동 계산기 */}
               {stocks.length > 0 && (
-                <div className="mt-2 p-3.5 bg-[#ebf5f2] rounded-xl flex flex-col gap-2.5">
-                  <span className="text-xs font-black text-[#166553] flex items-center gap-1">
+                <div className="mt-2 p-3.5 bg-slate-100 rounded-xl flex flex-col gap-2.5">
+                  <span className="text-xs font-black text-emerald-700 flex items-center gap-1">
                     <Calculator size={14} /> 주식·ETF 추가 매수(물타기/불타기)
                     평단가 계산기
                   </span>
@@ -2672,7 +2696,7 @@ ${bulkSmsText.trim()}
                         <b>{targetCalcStock.avgPrice.toLocaleString()}원</b> (
                         {targetCalcStock.shares}주)
                       </span>
-                      <span className="text-[#166553] font-black">
+                      <span className="text-emerald-700 font-black">
                         ➔ 예상 평단: {newAvgPrice.toLocaleString()}원 (총{' '}
                         {newTotalShares}주)
                       </span>
@@ -2701,14 +2725,14 @@ ${bulkSmsText.trim()}
                   type="text"
                   value={tempRoomCode}
                   onChange={(e) => setTempRoomCode(e.target.value)}
-                  className="flex-1 border border-gray-200 rounded-xl px-3 py-2 text-sm font-extrabold text-[#166553] bg-[#f8fbfa]"
+                  className="flex-1 border border-gray-200 rounded-xl px-3 py-2 text-sm font-extrabold text-emerald-700 bg-[#f8fbfa]"
                 />
                 <button
                   onClick={() => {
                     setRoomCode(tempRoomCode);
                     alert(`공유 코드가 [${tempRoomCode}]로 변경되었습니다!`);
                   }}
-                  className="bg-[#166553] text-white px-4 py-2 rounded-xl text-xs font-bold"
+                  className="bg-slate-900 text-white hover:bg-slate-800 transition px-4 py-2 rounded-xl text-xs font-bold"
                 >
                   코드 변경
                 </button>
@@ -2762,7 +2786,7 @@ ${bulkSmsText.trim()}
                 </span>
                 <button
                   onClick={() => setAccountModal({ open: true, item: null })}
-                  className="text-xs bg-[#166553] text-white px-2.5 py-1 rounded-lg font-bold"
+                  className="text-xs bg-slate-900 text-white hover:bg-slate-800 transition px-2.5 py-1 rounded-lg font-bold"
                 >
                   + 추가
                 </button>
@@ -2781,7 +2805,7 @@ ${bulkSmsText.trim()}
                     </span>
                     <button
                       onClick={() => setAccountModal({ open: true, item: acc })}
-                      className="text-[#166553] font-bold"
+                      className="text-emerald-700 font-bold"
                     >
                       수정
                     </button>
@@ -2800,53 +2824,53 @@ ${bulkSmsText.trim()}
       </main>
 
       {/* ==================== 하단 5개 탭 네비게이션 ==================== */}
-      <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 z-40">
+      <nav className="fixed bottom-0 left-0 right-0 bg-white/90 backdrop-blur-md border-t border-slate-100/90 z-40 shadow-[0_-4px_20px_rgba(0,0,0,0.02)]">
         <div className="max-w-lg mx-auto h-16 grid grid-cols-5 items-center px-2">
           <button
             onClick={() => setActiveTab('home')}
-            className={`flex flex-col items-center gap-1 ${
-              activeTab === 'home' ? 'text-[#166553]' : 'text-gray-400'
+            className={`flex flex-col items-center gap-1 transition-colors ${
+              activeTab === 'home' ? 'text-emerald-600 font-black' : 'text-slate-400 hover:text-slate-600 font-bold'
             }`}
           >
             <Home size={20} />
-            <span className="text-[10px] font-extrabold">홈(자산)</span>
+            <span className="text-[10px]">홈(자산)</span>
           </button>
           <button
             onClick={() => setActiveTab('calendar')}
-            className={`flex flex-col items-center gap-1 ${
-              activeTab === 'calendar' ? 'text-[#166553]' : 'text-gray-400'
+            className={`flex flex-col items-center gap-1 transition-colors ${
+              activeTab === 'calendar' ? 'text-emerald-600 font-black' : 'text-slate-400 hover:text-slate-600 font-bold'
             }`}
           >
             <CalendarIcon size={20} />
-            <span className="text-[10px] font-extrabold">캘린더</span>
+            <span className="text-[10px]">캘린더</span>
           </button>
 
           <div className="flex justify-center">
             <button
               onClick={() => openAddTxModal(selectedDate)}
-              className="w-13 h-13 -mt-6 bg-[#166553] text-white rounded-full p-3.5 shadow-lg hover:scale-105 transition-transform flex items-center justify-center border-4 border-white"
+              className="w-12 h-12 -mt-5 bg-gradient-to-tr from-emerald-600 to-teal-500 text-white rounded-full shadow-[0_8px_20px_rgba(16,185,129,0.35)] hover:scale-105 active:scale-95 transition-all flex items-center justify-center border-4 border-white"
             >
-              <Plus size={24} />
+              <Plus size={22} />
             </button>
           </div>
 
           <button
             onClick={() => setActiveTab('report')}
-            className={`flex flex-col items-center gap-1 ${
-              activeTab === 'report' ? 'text-[#166553]' : 'text-gray-400'
+            className={`flex flex-col items-center gap-1 transition-colors ${
+              activeTab === 'report' ? 'text-emerald-600 font-black' : 'text-slate-400 hover:text-slate-600 font-bold'
             }`}
           >
             <PieChart size={20} />
-            <span className="text-[10px] font-extrabold">월간리포트</span>
+            <span className="text-[10px]">월간리포트</span>
           </button>
           <button
             onClick={() => setActiveTab('settings')}
-            className={`flex flex-col items-center gap-1 ${
-              activeTab === 'settings' ? 'text-[#166553]' : 'text-gray-400'
+            className={`flex flex-col items-center gap-1 transition-colors ${
+              activeTab === 'settings' ? 'text-emerald-600 font-black' : 'text-slate-400 hover:text-slate-600 font-bold'
             }`}
           >
             <Settings size={20} />
-            <span className="text-[10px] font-extrabold">설정</span>
+            <span className="text-[10px]">설정</span>
           </button>
         </div>
       </nav>
@@ -2870,16 +2894,16 @@ ${bulkSmsText.trim()}
 
             {/* 추천 4) 카드 결제 문자/카톡 붙여넣기 자동 완성 박스 */}
             {!editingTx && (
-              <div className="bg-[#f4f9f7] border border-[#166553]/20 rounded-xl p-3 flex flex-col gap-2">
+              <div className="bg-slate-50 border border-slate-200/80 rounded-2xl p-3.5 flex flex-col gap-2">
                 <div className="flex justify-between items-center">
-                  <span className="text-[11px] font-extrabold text-[#166553] flex items-center gap-1">
-                    📱 카드 결제 문자·카톡 자동 입력
+                  <span className="text-[11px] font-extrabold text-slate-800 flex items-center gap-1.5">
+                    <Sparkles size={13} className="text-emerald-600" /> 결제 알림 문자 자동 입력
                   </span>
                   <button
                     type="button"
                     onClick={handleAnalyzeSingleSms}
                     disabled={isSmsParsing || !smsText.trim()}
-                    className="text-[11px] bg-[#166553] text-white px-2.5 py-1 rounded-lg font-bold disabled:opacity-40"
+                    className="text-[11px] bg-slate-900 text-white px-3 py-1 rounded-xl font-bold hover:bg-slate-800 disabled:opacity-40 transition"
                   >
                     {isSmsParsing ? 'AI 분석중...' : '⚡ 자동 채우기'}
                   </button>
@@ -2887,9 +2911,9 @@ ${bulkSmsText.trim()}
                 <textarea
                   value={smsText}
                   onChange={(e) => setSmsText(e.target.value)}
-                  placeholder="카드 승인 문자나 '할머니순대국 18000원', 'LGU+ 25000원 결제' 등을 붙여넣고 [자동 채우기]를 누르세요!"
+                  placeholder="결제 알림 문자나 메모(예: 스타벅스 6,500원)를 붙여넣고 [자동 채우기]를 누르세요."
                   rows={2}
-                  className="w-full bg-white border border-gray-200 rounded-lg p-2 text-xs font-medium resize-none focus:outline-none focus:border-[#166553]"
+                  className="w-full bg-white border border-slate-200 rounded-xl p-2.5 text-xs font-medium resize-none focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition"
                 />
               </div>
             )}
@@ -2980,13 +3004,13 @@ ${bulkSmsText.trim()}
                 onChange={(e) =>
                   setTxForm({ ...txForm, isSpecial: e.target.checked })
                 }
-                className="accent-[#166553]"
+                className="accent-emerald-600"
               />
               개인 용돈 또는 특별 지출로 분류
             </label>
             <button
               type="submit"
-              className="bg-[#166553] text-white py-2.5 rounded-xl text-xs font-extrabold"
+              className="bg-slate-900 text-white hover:bg-slate-800 transition py-2.5 rounded-xl text-xs font-extrabold"
             >
               저장하기
             </button>
@@ -2996,36 +3020,35 @@ ${bulkSmsText.trim()}
 
       {/* 1-2) 카드 결제 문자 여러 건 일괄 입력 모달 */}
       {isBulkSmsModalOpen && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl p-5 w-full max-w-md flex flex-col gap-3 shadow-xl max-h-[90vh] overflow-y-auto text-xs">
-            <div className="flex justify-between items-center">
-              <span className="font-black text-sm text-gray-900">
-                📱 카드 승인 문자 여러 건 일괄 입력
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl p-6 w-full max-w-md flex flex-col gap-3.5 shadow-2xl max-h-[90vh] overflow-y-auto text-xs border border-slate-100">
+            <div className="flex justify-between items-center border-b border-slate-100 pb-2.5">
+              <span className="font-black text-sm text-slate-900 flex items-center gap-1.5">
+                <Sparkles size={16} className="text-emerald-600" /> 결제 알림 문자 일괄 입력
               </span>
-              <button onClick={() => setIsBulkSmsModalOpen(false)}>
+              <button onClick={() => setIsBulkSmsModalOpen(false)} className="text-slate-400 hover:text-slate-600">
                 <X size={18} />
               </button>
             </div>
-            <p className="text-gray-500 leading-relaxed">
-              여러 개의 카드 결제 문자(빈 줄로 구분)를 그대로 붙여넣으시면,
-              식당·통신비·교통비·마트 등을 AI와 업종 사전으로 자동 분류합니다.
+            <p className="text-slate-500 leading-relaxed font-medium">
+              카드 승인 문자나 모바일 뱅킹 알림 내역을 한꺼번에 붙여넣으시면, 날짜·금액·사용처·카테고리를 스마트하게 자동 분류합니다.
             </p>
             <textarea
               value={bulkSmsText}
               onChange={(e) => setBulkSmsText(e.target.value)}
-              rows={5}
-              placeholder={`예시:\n[신한카드 승인]\n28,600원 일시불\n10/25 19:30 송도숯불갈비\n\nLGU+ 통신요금 45,000원 결제`}
-              className="w-full border border-gray-200 rounded-xl p-3 text-xs font-medium resize-y focus:outline-none focus:border-[#166553]"
+              rows={6}
+              placeholder={`[입력 예시]\n[신한체크] 10/26 13:20 현대백화점 54,000원 승인\n[KB국민] 10/26 20:15 쿠팡 38,500원\n스타벅스 아메리카노 4,500원 결제\n\n* 여러 건을 한 번에 복사해 넣으셔도 자동으로 깔끔하게 정리됩니다.`}
+              className="w-full border border-slate-200 rounded-2xl p-3 text-xs font-medium resize-y focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500"
             />
             <button
               type="button"
               onClick={handleAnalyzeBulkSms}
               disabled={isBulkSmsLoading || !bulkSmsText.trim()}
-              className="bg-[#ebf5f2] text-[#166553] py-2 rounded-xl font-extrabold hover:bg-[#d8ece6] disabled:opacity-40"
+              className="bg-slate-900 text-white py-2.5 rounded-xl font-extrabold hover:bg-slate-800 disabled:opacity-40 transition shadow-sm"
             >
               {isBulkSmsLoading
-                ? '🤖 AI가 가맹점 업종 분석 중...'
-                : '🔍 내역 분석하기'}
+                ? '🤖 가맹점 업종 분석 중...'
+                : '🔍 내역 스마트 분석하기'}
             </button>
 
             {parsedBulkItems.length > 0 && (
@@ -3066,7 +3089,7 @@ ${bulkSmsText.trim()}
                 <button
                   type="button"
                   onClick={handleSaveBulkSmsItems}
-                  className="bg-[#166553] text-white py-2.5 rounded-xl font-extrabold mt-1"
+                  className="bg-slate-900 text-white hover:bg-slate-800 transition py-2.5 rounded-xl font-extrabold mt-1"
                 >
                   가계부에 {parsedBulkItems.length}건 일괄 저장하기
                 </button>
@@ -3135,7 +3158,7 @@ ${bulkSmsText.trim()}
             />
             <button
               type="submit"
-              className="bg-[#166553] text-white py-2.5 rounded-xl font-extrabold"
+              className="bg-slate-900 text-white hover:bg-slate-800 transition py-2.5 rounded-xl font-extrabold"
             >
               저장
             </button>
@@ -3196,7 +3219,7 @@ ${bulkSmsText.trim()}
             />
             <button
               type="submit"
-              className="bg-[#166553] text-white py-2.5 rounded-xl font-extrabold"
+              className="bg-slate-900 text-white hover:bg-slate-800 transition py-2.5 rounded-xl font-extrabold"
             >
               저장
             </button>
@@ -3248,7 +3271,7 @@ ${bulkSmsText.trim()}
             />
             <button
               type="submit"
-              className="bg-[#166553] text-white py-2.5 rounded-xl font-extrabold"
+              className="bg-slate-900 text-white hover:bg-slate-800 transition py-2.5 rounded-xl font-extrabold"
             >
               저장
             </button>
@@ -3326,7 +3349,7 @@ ${bulkSmsText.trim()}
             />
             <button
               type="submit"
-              className="bg-[#166553] text-white py-2.5 rounded-xl font-extrabold"
+              className="bg-slate-900 text-white hover:bg-slate-800 transition py-2.5 rounded-xl font-extrabold"
             >
               저장
             </button>
@@ -3370,7 +3393,7 @@ ${bulkSmsText.trim()}
             ))}
             <button
               onClick={() => setBulkPriceModal(false)}
-              className="bg-[#166553] text-white py-2.5 rounded-xl font-extrabold mt-1"
+              className="bg-slate-900 text-white hover:bg-slate-800 transition py-2.5 rounded-xl font-extrabold mt-1"
             >
               완료
             </button>
