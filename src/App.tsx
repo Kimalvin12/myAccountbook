@@ -1171,6 +1171,38 @@ ${bulkSmsText.trim()}
       ? ((reportExpense - prevMonthExpense) / prevMonthExpense) * 100
       : null;
 
+  // --- 순자산 및 투자 계산 (netWorthTrend보다 항상 먼저 선언되어야 함) ---
+  const filteredAccounts = accounts.filter((a) => matchOwner(a.owner));
+  const filteredRealEstates = realEstates.filter((r) => matchOwner(r.owner));
+  const filteredLoans = loans.filter((l) => matchOwner(l.owner));
+  const filteredStocks = stocks.filter((s) => matchOwner(s.owner));
+
+  const totalCash = filteredAccounts.reduce((a, b) => a + b.balance, 0);
+  const totalRealEstate = filteredRealEstates.reduce((a, b) => a + b.amount, 0);
+  const totalLoanAmt = filteredLoans.reduce((a, b) => a + b.amount, 0);
+  const totalStockEval = filteredStocks.reduce(
+    (a, b) => a + b.shares * b.currentPrice,
+    0
+  );
+  const totalStockCost = filteredStocks.reduce(
+    (a, b) => a + b.shares * b.avgPrice,
+    0
+  );
+  const totalStockProfit = totalStockEval - totalStockCost;
+  const totalStockRate =
+    totalStockCost > 0 ? (totalStockProfit / totalStockCost) * 100 : 0;
+
+  const netWorth = totalCash + totalRealEstate + totalStockEval - totalLoanAmt;
+  const targetAchievementRate = Math.min(
+    100,
+    Math.max(0, (netWorth / targetAsset) * 100)
+  );
+  const monthlySavingEst = Math.max(500000, reportIncome - reportExpense);
+  const monthsToTarget =
+    netWorth >= targetAsset
+      ? 0
+      : Math.ceil((targetAsset - netWorth) / monthlySavingEst);
+
   // 금융자산(주식·ETF) 전월 대비 증감 및 등락률 계산
   const stockMonthDiff = useMemo(() => {
     return stocks.reduce((acc, st) => {
@@ -1188,7 +1220,7 @@ ${bulkSmsText.trim()}
     return totalPrevEval > 0 ? (stockMonthDiff / totalPrevEval) * 100 : 0;
   }, [stocks, stockMonthDiff]);
 
-  // 최근 6개월 순자산 변동 추이 (자동 연산)
+  // 최근 6개월 순자산 변동 추이 (자동 연산 - 이제 netWorth가 정상 참조됨)
   const netWorthTrend = useMemo(() => {
     const len = sixMonthTrend.length;
     const history = new Array(len);
@@ -1232,38 +1264,6 @@ ${bulkSmsText.trim()}
       return { ...item, startPct };
     });
   }, [reportTxs, reportExpense]);
-
-  // --- 순자산 및 투자 계산 ---
-  const filteredAccounts = accounts.filter((a) => matchOwner(a.owner));
-  const filteredRealEstates = realEstates.filter((r) => matchOwner(r.owner));
-  const filteredLoans = loans.filter((l) => matchOwner(l.owner));
-  const filteredStocks = stocks.filter((s) => matchOwner(s.owner));
-
-  const totalCash = filteredAccounts.reduce((a, b) => a + b.balance, 0);
-  const totalRealEstate = filteredRealEstates.reduce((a, b) => a + b.amount, 0);
-  const totalLoanAmt = filteredLoans.reduce((a, b) => a + b.amount, 0);
-  const totalStockEval = filteredStocks.reduce(
-    (a, b) => a + b.shares * b.currentPrice,
-    0
-  );
-  const totalStockCost = filteredStocks.reduce(
-    (a, b) => a + b.shares * b.avgPrice,
-    0
-  );
-  const totalStockProfit = totalStockEval - totalStockCost;
-  const totalStockRate =
-    totalStockCost > 0 ? (totalStockProfit / totalStockCost) * 100 : 0;
-
-  const netWorth = totalCash + totalRealEstate + totalStockEval - totalLoanAmt;
-  const targetAchievementRate = Math.min(
-    100,
-    Math.max(0, (netWorth / targetAsset) * 100)
-  );
-  const monthlySavingEst = Math.max(500000, reportIncome - reportExpense);
-  const monthsToTarget =
-    netWorth >= targetAsset
-      ? 0
-      : Math.ceil((targetAsset - netWorth) / monthlySavingEst);
 
   // --- 영수증 추가/수정/삭제 핸들러 ---
   const openAddTxModal = (dateStr) => {
