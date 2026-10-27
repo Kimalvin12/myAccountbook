@@ -201,7 +201,7 @@ export default function App() {
 
   const [ownerFilter, setOwnerFilter] = useState('전체');
   const [roomCode, setRoomCode] = useState(
-    () => localStorage.getItem('roomCode') || 'sweet-home-2026'
+    () => localStorage.getItem('roomCode') || 'KKSWEETHOME'
   );
   const [tempRoomCode, setTempRoomCode] = useState(roomCode);
   const [syncStatus, setSyncStatus] = useState('실시간 연동중');
@@ -494,17 +494,17 @@ export default function App() {
   }, [roomCode]);
 
   const syncToCloud = async (overrides = {}) => {
-    const payload = {
-      transactions: overrides.transactions ?? transactions,
-      accounts: overrides.accounts ?? accounts,
-      realEstates: overrides.realEstates ?? realEstates,
-      loans: overrides.loans ?? loans,
-      stocks: overrides.stocks ?? stocks,
-      targetAsset: overrides.targetAsset ?? targetAsset,
-      monthlyBudget: overrides.monthlyBudget ?? monthlyBudget,
-    };
+    const payload = {};
+    if (overrides.transactions !== undefined) payload.transactions = overrides.transactions;
+    if (overrides.accounts !== undefined) payload.accounts = overrides.accounts;
+    if (overrides.realEstates !== undefined) payload.realEstates = overrides.realEstates;
+    if (overrides.loans !== undefined) payload.loans = overrides.loans;
+    if (overrides.stocks !== undefined) payload.stocks = overrides.stocks;
+    if (overrides.targetAsset !== undefined) payload.targetAsset = overrides.targetAsset;
+    if (overrides.monthlyBudget !== undefined) payload.monthlyBudget = overrides.monthlyBudget;
+
     try {
-      await setDoc(doc(db, 'budgets', roomCode), payload);
+      await setDoc(doc(db, 'budgets', roomCode), payload, { merge: true });
     } catch (e) {
       console.error('Cloud sync error:', e);
     }
@@ -806,15 +806,6 @@ export default function App() {
     }
   };
 
-  // ★ [자동 실시간 동기화] 앱 초기화 및 월간리포트 탭 진입 시 네이버 전월 공식 종가 자동 로드
-  useEffect(() => {
-    if (stocks && stocks.length > 0) {
-      const hasMissingPrev = stocks.some((s) => !s.prevMonthPrice || s.prevMonthPrice <= 0);
-      if (hasMissingPrev || activeTab === 'report') {
-        syncRealTimeStockPrices(true);
-      }
-    }
-  }, [activeTab, stocks?.length]);
   // --- 4) 카드 결제 문자/카톡 스마트 파싱 (규칙 파서 + Gemini AI 업종 추론 결합) ---
   const parseRawSmsBlocks = (rawText) => {
     const blocks = rawText
