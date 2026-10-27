@@ -550,19 +550,29 @@ export default function App() {
     }
     setIsAiLoading(true);
     try {
-      const catSummary = categoryBreakdown
-        .map((c) => `${c.cat}: ${c.amt.toLocaleString()}원(${c.pct}%)`)
-        .join(', ');
-      const prompt = `우리 부부의 ${currentYear}년 ${currentMonth}월 가계부 현황을 진단해 주세요.
-- 이번 달 총수입: ${reportIncome.toLocaleString()}원
-- 이번 달 총지출: ${reportExpense.toLocaleString()}원 (목표 예산: ${monthlyBudget.toLocaleString()}원)
-- 저축률: ${savingsRate.toFixed(1)}%
-- 카테고리별 지출: ${catSummary || '내역 없음'}
+      const topCat = categoryBreakdown[0] ? categoryBreakdown[0].cat : '식비';
+      const topCatAmt = categoryBreakdown[0] ? categoryBreakdown[0].amt : 0;
+      const saving10Pct = Math.round((topCatAmt * 0.1) / 10000);
 
-전문적이고 위트 있는 부부 자산관리 전문가로서 현실적이고 명쾌한 재무 리포트를 작성해 주세요:
-1. 이번 달 부부 소비 및 식비/고정비 지출 밸런스 평가
-2. 맞벌이/부부 저축률 극대화 및 순자산 달성을 위한 핵심 조언
-3. 다음 달 즉시 실천 가능한 생활비 절약 팁 2가지`;
+      const prompt = `우리 부부의 ${currentYear}년 ${currentMonth}월 가계부 재무 현황 데이터입니다:
+- 총수입: ${reportIncome.toLocaleString()}원
+- 순수 생활지출(카드대금 제외): ${reportExpense.toLocaleString()}원
+- 카드대금(지출 분리완료): ${totalTransfer.toLocaleString()}원
+- 부부 저축률: ${savingsRate.toFixed(1)}%
+- 총 순자산: ${Math.round(netWorth / 10000).toLocaleString()}만원
+- 금융자산(주식·ETF) 전월비 평가손익: ${stockMonthDiff >= 0 ? '+' : ''}${Math.round(stockMonthDiff / 10000).toLocaleString()}만원 (${stockMonthDiffRate.toFixed(1)}%)
+- 이번 달 최다 지출 항목: ${topCat} (${topCatAmt.toLocaleString()}원)
+
+[작성 지침 - 절대 준수]
+1. 가벼운 농담, 과도한 감탄사/이모지, 불필요한 서론·인사말은 일체 작성하지 마세요.
+2. 품격 있고 신뢰감 넘치는 금융 PB 전문가의 단정하고 명쾌한 어조를 유지하세요.
+3. 반드시 아래의 4개 불릿 구조로만 간결하게 작성하세요:
+
+💡 [AI 부부 자산관리 진단]
+• 부부 저축률 진단: 이번 달 저축률(${savingsRate.toFixed(1)}%)에 대한 객관적 재무 건전성 평가 (1~2줄)
+• 카드대금 분리 검증: 카드대금(${totalTransfer.toLocaleString()}원)을 생활비에서 분리하여 순수 생활비(${reportExpense.toLocaleString()}원)가 중복 없이 정확히 집계되었음을 확인 (1줄)
+• 순자산 및 투자 평가: 순자산 성장 흐름과 금융자산 변동(${stockMonthDiff >= 0 ? '+' : ''}${Math.round(stockMonthDiff / 10000).toLocaleString()}만원)에 따른 자산 증식 진단 (1줄)
+• 핀셋 절약 제안: ${topCat} 지출을 전월 대비 10%만 절감할 경우 매월 약 ${saving10Pct}만원의 투자 자금을 추가 확보할 수 있다는 구체적 조언 (1줄)`;
 
       const text = await callGeminiText(prompt, false);
       setAiReport(text);
