@@ -805,6 +805,16 @@ export default function App() {
       setIsStockSyncing(false);
     }
   };
+
+  // ★ [자동 실시간 동기화] 앱 초기화 및 월간리포트 탭 진입 시 네이버 전월 공식 종가 자동 로드
+  useEffect(() => {
+    if (stocks && stocks.length > 0) {
+      const hasMissingPrev = stocks.some((s) => !s.prevMonthPrice || s.prevMonthPrice <= 0);
+      if (hasMissingPrev || activeTab === 'report') {
+        syncRealTimeStockPrices(true);
+      }
+    }
+  }, [activeTab, stocks?.length]);
   // --- 4) 카드 결제 문자/카톡 스마트 파싱 (규칙 파서 + Gemini AI 업종 추론 결합) ---
   const parseRawSmsBlocks = (rawText) => {
     const blocks = rawText
@@ -1878,13 +1888,24 @@ ${bulkSmsText.trim()}
                   <TrendingUp size={16} className="text-emerald-400" />
                   <span className="text-xs font-black text-white">📈 금융자산(주식·ETF) 전월 대비 변동</span>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => setIsStockDetailOpen(!isStockDetailOpen)}
-                  className="text-[11px] bg-white/10 hover:bg-white/20 text-emerald-300 font-bold px-2.5 py-1 rounded-full transition flex items-center gap-1"
-                >
-                  {isStockDetailOpen ? '종목별 닫기 ▲' : '종목별 상세 보기 ▼'}
-                </button>
+                <div className="flex items-center gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => syncRealTimeStockPrices(false)}
+                    disabled={isStockSyncing}
+                    className="text-[11px] bg-white/10 hover:bg-white/20 text-emerald-300 font-bold px-2 py-1 rounded-full transition flex items-center gap-1 disabled:opacity-40"
+                  >
+                    <RefreshCw size={12} className={isStockSyncing ? 'animate-spin' : ''} />
+                    {isStockSyncing ? '조회중' : '시세 갱신'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setIsStockDetailOpen(!isStockDetailOpen)}
+                    className="text-[11px] bg-white/10 hover:bg-white/20 text-emerald-300 font-bold px-2.5 py-1 rounded-full transition flex items-center gap-1"
+                  >
+                    {isStockDetailOpen ? '종목별 닫기 ▲' : '종목별 상세 보기 ▼'}
+                  </button>
+                </div>
               </div>
 
               <div className="flex justify-between items-end pt-0.5">
