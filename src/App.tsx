@@ -437,6 +437,33 @@ export default function App() {
   const [isStockSyncing, setIsStockSyncing] = useState(false);
   const [lastStockSyncTime, setLastStockSyncTime] = useState('');
 
+  // 바텀시트 제스처 드래그 상태
+  const [sheetTranslateY, setSheetTranslateY] = useState(0);
+  const [isDraggingSheet, setIsDraggingSheet] = useState(false);
+  const dragStartYRef = React.useRef(0);
+
+  const handleSheetTouchStart = (e) => {
+    dragStartYRef.current = e.touches[0].clientY;
+    setIsDraggingSheet(true);
+  };
+
+  const handleSheetTouchMove = (e) => {
+    if (!isDraggingSheet) return;
+    const currentY = e.touches[0].clientY;
+    const diff = currentY - dragStartYRef.current;
+    if (diff > 0) {
+      setSheetTranslateY(diff);
+    }
+  };
+
+  const handleSheetTouchEnd = () => {
+    setIsDraggingSheet(false);
+    if (sheetTranslateY > 120) {
+      setIsTxModalOpen(false);
+    }
+    setSheetTranslateY(0);
+  };
+
   // 평단가 물타기/불타기 계산기 상태
   const [calcStockId, setCalcStockId] = useState(1);
   const [addShares, setAddShares] = useState('50');
@@ -3166,20 +3193,33 @@ ${bulkSmsText.trim()}
       </nav>
 
       {/* ==================== 모달창 영역 ==================== */}
-      {/* 1) 영수증 입력/수정 모달 (토스/카카오뱅크 스타일 바텀시트 전면 적용) */}
+      {/* 1) 영수증 입력/수정 모달 (토스/카카오뱅크 스타일 바텀시트 + 터치 스와이프 닫기 & 새로고침 원천차단) */}
       {isTxModalOpen && (
         <div
           onClick={(e) => {
             if (e.target === e.currentTarget) setIsTxModalOpen(false);
           }}
-          className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-end justify-center transition-all animate-fadeIn"
+          className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-end justify-center transition-all touch-none select-none"
+          style={{ overscrollBehavior: 'contain' }}
         >
           <form
             onSubmit={handleSaveTx}
-            className="bg-white rounded-t-[32px] p-5 sm:p-6 w-full max-w-lg flex flex-col gap-3.5 shadow-[0_-10px_40px_rgba(0,0,0,0.15)] max-h-[88vh] overflow-y-auto transform transition-transform duration-300 ease-out translate-y-0"
+            style={{
+              transform: `translateY(${sheetTranslateY}px)`,
+              transition: isDraggingSheet ? 'none' : 'transform 0.25s cubic-bezier(0.16, 1, 0.3, 1)',
+              overscrollBehavior: 'contain',
+            }}
+            className="bg-white rounded-t-[32px] p-5 sm:p-6 w-full max-w-lg flex flex-col gap-3.5 shadow-[0_-12px_48px_rgba(0,0,0,0.2)] max-h-[90vh] overflow-y-auto"
           >
-            {/* 바텀시트 전용 상단 그립 핸들 (터치로 쓸어내리는 시각 효과) */}
-            <div className="w-12 h-1.5 bg-slate-300 rounded-full mx-auto -mt-1 mb-1 shrink-0" />
+            {/* 바텀시트 전용 상단 그립 핸들 터치 영역 (손가락으로 아래로 슥 내리면 부드럽게 닫힘) */}
+            <div
+              onTouchStart={handleSheetTouchStart}
+              onTouchMove={handleSheetTouchMove}
+              onTouchEnd={handleSheetTouchEnd}
+              className="w-full pt-1 pb-3 flex justify-center cursor-grab active:cursor-grabbing touch-none -mt-2"
+            >
+              <div className="w-12 h-1.5 bg-slate-300 hover:bg-slate-400 active:bg-slate-500 rounded-full transition-colors" />
+            </div>
 
             <div className="flex justify-between items-center pb-2 border-b border-slate-100 shrink-0">
               <span className="font-black text-slate-900 text-base">
