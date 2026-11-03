@@ -3166,18 +3166,23 @@ ${bulkSmsText.trim()}
       </nav>
 
       {/* ==================== 모달창 영역 ==================== */}
-      {/* 1) 영수증 입력/수정 모달 (토스/카카오뱅크 감성 바텀시트 + 천단위 자동 콤마) */}
+      {/* 1) 영수증 입력/수정 모달 (토스/카카오뱅크 스타일 바텀시트 전면 적용) */}
       {isTxModalOpen && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 transition-all">
+        <div
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setIsTxModalOpen(false);
+          }}
+          className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-end justify-center transition-all animate-fadeIn"
+        >
           <form
             onSubmit={handleSaveTx}
-            className="bg-white rounded-t-[32px] sm:rounded-3xl p-5 sm:p-6 w-full max-w-md flex flex-col gap-3.5 shadow-2xl max-h-[92vh] overflow-y-auto animate-in slide-in-from-bottom duration-200"
+            className="bg-white rounded-t-[32px] p-5 sm:p-6 w-full max-w-lg flex flex-col gap-3.5 shadow-[0_-10px_40px_rgba(0,0,0,0.15)] max-h-[88vh] overflow-y-auto transform transition-transform duration-300 ease-out translate-y-0"
           >
-            {/* 바텀시트 손잡이 바 (모바일 전용 드래그 핸들) */}
-            <div className="w-10 h-1 bg-slate-200 rounded-full mx-auto sm:hidden -mt-1 mb-1" />
+            {/* 바텀시트 전용 상단 그립 핸들 (터치로 쓸어내리는 시각 효과) */}
+            <div className="w-12 h-1.5 bg-slate-300 rounded-full mx-auto -mt-1 mb-1 shrink-0" />
 
-            <div className="flex justify-between items-center pb-1 border-b border-slate-100">
-              <span className="font-black text-slate-900 text-sm">
+            <div className="flex justify-between items-center pb-2 border-b border-slate-100 shrink-0">
+              <span className="font-black text-slate-900 text-base">
                 {editingTx ? '내역 수정' : '새 가계부 내역 입력'}
               </span>
               <button
