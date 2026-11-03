@@ -1520,23 +1520,31 @@ ${bulkSmsText.trim()}
   const openEditTxModal = (tx) => {
     setEditingTx(tx);
     setSmsText('');
-    setTxForm({ ...tx, note: tx.note || '', amount: String(tx.amount) });
+    setTxForm({
+      ...tx,
+      note: tx.note || '',
+      amount: tx.amount ? Number(tx.amount).toLocaleString('ko-KR') : '',
+    });
     setIsTxModalOpen(true);
   };
 
   const handleSaveTx = (e) => {
     e.preventDefault();
-    if (!txForm.amount) return;
+    const rawNum = Number(String(txForm.amount || '').replace(/,/g, ''));
+    if (!rawNum || isNaN(rawNum)) {
+      alert('금액을 올바르게 입력해 주세요.');
+      return;
+    }
     let updated;
     if (editingTx) {
       updated = transactions.map((t) =>
         t.id === editingTx.id
-          ? { ...txForm, id: editingTx.id, amount: Number(txForm.amount) }
+          ? { ...txForm, id: editingTx.id, amount: rawNum }
           : t
       );
     } else {
       updated = [
-        { ...txForm, id: Date.now(), amount: Number(txForm.amount) },
+        { ...txForm, id: Date.now(), amount: rawNum },
         ...transactions,
       ];
     }
@@ -3158,23 +3166,30 @@ ${bulkSmsText.trim()}
       </nav>
 
       {/* ==================== 모달창 영역 ==================== */}
-      {/* 1) 영수증 입력/수정 모달 (캡처 사진 & 카드 결제 문자 자동분석 포함) */}
+      {/* 1) 영수증 입력/수정 모달 (토스/카카오뱅크 감성 바텀시트 + 천단위 자동 콤마) */}
       {isTxModalOpen && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 transition-all">
           <form
             onSubmit={handleSaveTx}
-            className="bg-white rounded-2xl p-5 w-full max-w-sm flex flex-col gap-3 shadow-xl max-h-[90vh] overflow-y-auto"
+            className="bg-white rounded-t-[32px] sm:rounded-3xl p-5 sm:p-6 w-full max-w-md flex flex-col gap-3.5 shadow-2xl max-h-[92vh] overflow-y-auto animate-in slide-in-from-bottom duration-200"
           >
-            <div className="flex justify-between items-center">
-              <span className="font-black text-gray-900">
+            {/* 바텀시트 손잡이 바 (모바일 전용 드래그 핸들) */}
+            <div className="w-10 h-1 bg-slate-200 rounded-full mx-auto sm:hidden -mt-1 mb-1" />
+
+            <div className="flex justify-between items-center pb-1 border-b border-slate-100">
+              <span className="font-black text-slate-900 text-sm">
                 {editingTx ? '내역 수정' : '새 가계부 내역 입력'}
               </span>
-              <button type="button" onClick={() => setIsTxModalOpen(false)}>
-                <X size={20} />
+              <button
+                type="button"
+                onClick={() => setIsTxModalOpen(false)}
+                className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-500 transition"
+              >
+                <X size={18} />
               </button>
             </div>
 
-            {/* 추천 4) 캡처 사진 또는 카드 결제 문자 자동 완성 박스 */}
+            {/* 캡처 사진 또는 카드 결제 문자 자동 완성 박스 */}
             {!editingTx && (
               <div className="bg-slate-50 border border-slate-200/80 rounded-2xl p-3 flex flex-col gap-2">
                 <div className="flex justify-between items-center gap-1.5">
@@ -3233,20 +3248,65 @@ ${bulkSmsText.trim()}
                 ))}
               </div>
             </div>
+
+            {/* 금액 입력칸 (실시간 천 단위 콤마 서식 적용) */}
+            <div className="relative">
+              <input
+                type="text"
+                inputMode="numeric"
+                placeholder="금액 (원)"
+                value={txForm.amount}
+                onChange={(e) => {
+                  const raw = e.target.value.replace(/[^\d]/g, '');
+                  const formatted = raw ? Number(raw).toLocaleString('ko-KR') : '';
+                  setTxForm({ ...txForm, amount: formatted });
+                }}
+                className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm font-extrabold text-slate-900 placeholder:font-medium placeholder:text-slate-400 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 outline-none"
+                required
+              />
+              <span className="absolute right-3 top-2.5 text-xs font-bold text-slate-400">원</span>
+            </div>
+
+            <input
+              type="text"
+              placeholder="내용 (예: 마트 장보기, 식당 이름)"
+              value={txForm.memo}
+              onChange={(e) => {
+                const newMemo = e.target.value;
+                const guessed = classifyKoreanMerchant(newMemo);
+                setTxForm((prev) => ({
+                  ...prev,
+                  memo: newMemo,
+                  category:
+                    guessed !== '용돈/기타' ? guessed : prev.category,
+                }));
+              }}
+              className="border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-slate-800 placeholder:font-medium placeholder:text-slate-400 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 outline-none"
+            />
+
+            <input
+              type="text"
+              placeholder="특이사항 (선택)"
+              value={txForm.note || ''}
+              onChange={(e) => setTxForm({ ...txForm, note: e.target.value })}
+              className="border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-slate-800 placeholder:font-medium placeholder:text-slate-400 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 outline-none"
+            />
+
             <input
               type="date"
               value={txForm.date}
               onChange={(e) => setTxForm({ ...txForm, date: e.target.value })}
-              className="border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-slate-800"
+              className="border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-slate-800 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 outline-none"
               required
             />
+
             <div className="grid grid-cols-2 gap-2">
               <select
                 value={txForm.owner}
                 onChange={(e) =>
                   setTxForm({ ...txForm, owner: e.target.value })
                 }
-                className="border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-slate-800"
+                className="border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-slate-800 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 outline-none bg-white"
               >
                 <option value="공동">공동</option>
                 <option value="남편">남편</option>
@@ -3257,7 +3317,7 @@ ${bulkSmsText.trim()}
                 onChange={(e) =>
                   setTxForm({ ...txForm, category: e.target.value })
                 }
-                className="border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-slate-800"
+                className="border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-slate-800 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 outline-none bg-white"
               >
                 {ALL_CATEGORIES.map((c) => (
                   <option key={c} value={c}>
@@ -3266,38 +3326,7 @@ ${bulkSmsText.trim()}
                 ))}
               </select>
             </div>
-            <input
-              type="number"
-              placeholder="금액 (원)"
-              value={txForm.amount}
-              onChange={(e) => setTxForm({ ...txForm, amount: e.target.value })}
-              className="border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-slate-800 placeholder:font-medium placeholder:text-slate-400"
-              required
-            />
-            <input
-              type="text"
-              placeholder="내용 (예: 마트 장보기, 식당 이름)"
-              value={txForm.memo}
-              onChange={(e) => {
-                const newMemo = e.target.value;
-                // 내용을 직접 입력할 때도 자동으로 식당/통신비/교통비 등 카테고리 추론
-                const guessed = classifyKoreanMerchant(newMemo);
-                setTxForm((prev) => ({
-                  ...prev,
-                  memo: newMemo,
-                  category:
-                    guessed !== '용돈/기타' ? guessed : prev.category,
-                }));
-              }}
-              className="border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-slate-800 placeholder:font-medium placeholder:text-slate-400"
-            />
-            <input
-              type="text"
-              placeholder="특이사항 (선택)"
-              value={txForm.note || ''}
-              onChange={(e) => setTxForm({ ...txForm, note: e.target.value })}
-              className="border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-slate-800 placeholder:font-medium placeholder:text-slate-400"
-            />
+
             <label className="flex items-center gap-2 text-xs font-bold text-gray-600">
               <input
                 type="checkbox"
@@ -3311,7 +3340,7 @@ ${bulkSmsText.trim()}
             </label>
             <button
               type="submit"
-              className="bg-slate-900 text-white hover:bg-slate-800 transition py-2.5 rounded-xl text-xs font-extrabold"
+              className="bg-slate-900 text-white hover:bg-slate-800 active:scale-[0.98] transition py-3 rounded-2xl text-xs font-extrabold shadow-md mt-1"
             >
               저장하기
             </button>
