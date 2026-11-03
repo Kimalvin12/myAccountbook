@@ -948,7 +948,7 @@ export default function App() {
       reader.readAsDataURL(file);
     });
 
-  // 단건 모달에서 캡처 이미지 업로드 시 자동 분석
+  // 단건 모달에서 캡처 이미지 업로드 시 자동 분석 (1건이면 단건 폼에 채우고, 2건 이상이면 일괄 리스트 모달로 자동 전환)
   const handleSingleImageUpload = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -962,7 +962,7 @@ export default function App() {
     setIsSmsParsing(true);
     try {
       const part = await fileToGenerativePart(file);
-      const prompt = `이 결제 내역/영수증 캡처 이미지를 분석해서 가장 핵심이 되는 결제 내역 1건을 JSON 객체로만 답해줘. (만약 여러 건이면 첫 번째 건 또는 합계 건)
+      const prompt = `이 카드사 앱 결제내역, 은행 거래내역, 영수증 캡처 이미지에 보이는 **모든 거래 내역을 빠짐없이 전부 추출**해서 JSON 배열로만 답해줘. (항목이 1개든 10개든 보이는 모든 내역을 추출할 것)
 허용 카테고리 목록: ${ALL_CATEGORIES.join(', ')}
 - 식당, 밥집, 고깃집, 분식, 치킨, 배달, 카페, 빵집 등은 "외식/카페"
 - 마트, 편의점, 식자재, 정육점, 반찬가게 등은 "식비"
@@ -970,37 +970,82 @@ export default function App() {
 - 주유소, 택시, 기차, 버스, 주차, 하이패스는 "교통/차량"
 - 약국, 병원, 의원, 치과, 한의원은 "의료/건강"
 - 온라인쇼핑(쿠팡, 네이버페이 등), 백화점, 다이소, 올리브영, 미용실 등은 "쇼핑/생활"
+- 취소된 결제나 잔액 표시는 제외하고 실제 승인/결제/출금/입금 건만 추출해.
 
-출력 형식 (순수 JSON만 출력):
-{"date": "YYYY-MM-DD (연도가 없으면 ${currentYear}년 기준, 날짜가 안 보이면 ${
+출력 형식 (순수 JSON 배열만 출력):
+[{"date": "YYYY-MM-DD (연도가 안 보이면 ${currentYear}년 기준, 날짜가 전혀 안 보이면 ${
         selectedDate || todayInfo.dateStr
-      })", "type": "지출 또는 수입", "amount": 숫자만, "memo": "가맹점명/사용처 깔끔하게", "note": "할부/할인 등 특이사항이 있으면 짧게 아니면 빈문자열", "category": "위 허용 카테고리 중 하나"}`;
+      })", "type": "지출 또는 수입", "amount": 숫자만, "memo": "가맹점명/사용처 깔끔하게", "note": "특이사항 있으면 간략히 없으면 빈문자열", "category": "위 허용 카테고리 중 하나"}]`;
 
       const aiResText = await callGeminiText(prompt, false, [
         { inline_data: part.inline_data },
       ]);
-      const jsonMatch = aiResText.match(/\{[\s\S]*\}/);
-      if (jsonMatch) {
-        const aiParsed = JSON.parse(jsonMatch[0]);
+      const arrMatch = aiResText.match(/\[[\s\S]*\]/);
+      let items = [];
+      if (arrMatch) {
+        try {
+          const parsedArr = JSON.parse(arrMatch[0]);
+          if (Array.isArray(parsedArr)) items = parsedArr;
+        } catch (e) {}
+      }
+
+      if (items.length === 0) {
+        // 단건 객체로 응답했을 경우에 대한 폴백
+        const jsonMatch = aiResText.match(/\{[\s\S]*\}/);
+        if (jsonMatch) {
+          try {
+            const single = JSON.parse(jsonMatch[0]);
+            if (single && single.amount) items = [single];
+          } catch (e) {}
+        }
+      }
+
+      if (items.length > 1) {
+        // 2건 이상인 경우: 사용자가 편리하게 일괄 검토할 수 있도록 일괄입력 모달을 자동으로 열어 리스트로 표시
+        const formattedItems = items.map((it) => ({
+          date:
+            it.date && /^\d{4}-\d{2}-\d{2}$/.test(String(it.date))
+              ? it.date
+              : selectedDate || todayInfo.dateStr,
+          type: it.type === '수입' ? '수입' : '지출',
+          category: ALL_CATEGORIES.includes(it.category)
+            ? it.category
+            : classifyKoreanMerchant(it.memo),
+          amount: Number(String(it.amount || 0).replace(/,/g, '')),
+          owner: ownerFilter === '전체' ? '공동' : ownerFilter,
+          memo: it.memo || '카드 결제',
+          note: it.note || '',
+          isSpecial: false,
+        }));
+        setIsTxModalOpen(false);
+        setBulkImages([part]);
+        setBulkSmsText('');
+        setParsedBulkItems(formattedItems.filter((i) => Number(i.amount) > 0));
+        setIsBulkSmsModalOpen(true);
+      } else if (items.length === 1) {
+        // 1건인 경우 기존 단건 폼에 바로 채움
+        const first = items[0];
         setTxForm((prev) => ({
           ...prev,
           date:
-            aiParsed.date && /^\d{4}-\d{2}-\d{2}$/.test(String(aiParsed.date))
-              ? aiParsed.date
+            first.date && /^\d{4}-\d{2}-\d{2}$/.test(String(first.date))
+              ? first.date
               : prev.date,
-          type: aiParsed.type === '수입' ? '수입' : '지출',
-          category: ALL_CATEGORIES.includes(aiParsed.category)
-            ? aiParsed.category
-            : classifyKoreanMerchant(aiParsed.memo || ''),
-          amount: aiParsed.amount
-            ? String(Number(String(aiParsed.amount).replace(/,/g, '')))
+          type: first.type === '수입' ? '수입' : '지출',
+          category: ALL_CATEGORIES.includes(first.category)
+            ? first.category
+            : classifyKoreanMerchant(first.memo || ''),
+          amount: first.amount
+            ? String(Number(String(first.amount).replace(/,/g, '')))
             : prev.amount,
-          memo: aiParsed.memo || prev.memo,
-          note: aiParsed.note || prev.note || '',
+          memo: first.memo || prev.memo,
+          note: first.note || prev.note || '',
         }));
+      } else {
+        alert('사진에서 결제 내역을 찾지 못했습니다. 조금 더 선명한 캡처 사진으로 다시 시도해 주세요.');
       }
     } catch (err) {
-      console.error('이미지 단건 분석 오류:', err);
+      console.error('이미지 분석 오류:', err);
       alert('캡처 이미지 분석에 실패했습니다: ' + (err.message || err));
     } finally {
       setIsSmsParsing(false);
