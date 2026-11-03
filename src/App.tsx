@@ -24,6 +24,8 @@ import {
   Download,
   MessageSquarePlus,
   BarChart2,
+  Image as ImageIcon,
+  Camera,
 } from 'lucide-react';
 
 // --- Firebase SDK 임포트 및 초기화 ---
@@ -200,9 +202,11 @@ export default function App() {
   }, [activeTab]);
 
   const [ownerFilter, setOwnerFilter] = useState('전체');
-  const [roomCode, setRoomCode] = useState(
-    () => localStorage.getItem('roomCode') || 'KKSWEETHOME'
-  );
+  const [roomCode, setRoomCode] = useState(() => {
+    const saved = localStorage.getItem('roomCode');
+    if (!saved || saved === 'KKSWEETHOME') return 'KKsweethome';
+    return saved;
+  });
   const [tempRoomCode, setTempRoomCode] = useState(roomCode);
   const [syncStatus, setSyncStatus] = useState('실시간 연동중');
 
@@ -230,96 +234,86 @@ export default function App() {
     }
   };
 
-  // --- 기본 데이터 상태 ---
+  // --- 기본 데이터 상태 (KKsweethome 실데이터와 100% 일치시켜 로딩 전/오프라인 시에도 실제 자산 표시) ---
   const [transactions, setTransactions] = useState([
     {
-      id: 1,
-      date: '2026-10-01',
+      id: 1793424697079,
+      date: '2026-10-29',
+      type: '지출',
+      category: '외식/카페',
+      amount: 41700,
+      owner: '공동',
+      memo: '리미니 연수 스퀘어원',
+      isSpecial: false,
+    },
+    {
+      id: 1793424673150,
+      date: '2026-10-31',
+      type: '지출',
+      category: '쇼핑/생활',
+      amount: 317200,
+      owner: '공동',
+      memo: '쿠첸',
+      isSpecial: false,
+    },
+    {
+      id: 1793060182320,
+      date: '2026-10-27',
       type: '지출',
       category: '식비',
-      amount: 99452,
-      owner: '공동',
-      memo: '이마트 트레이더스 장보기',
+      amount: 3900,
+      owner: '남편',
+      memo: '메가마트 스팟마트',
       isSpecial: false,
     },
     {
-      id: 2,
-      date: '2026-10-01',
-      type: '수입',
-      category: '부수입',
-      amount: 75000,
+      id: 1792994946756,
+      date: '2026-10-22',
+      type: '지출',
+      category: '주거/통신',
+      amount: 550000,
+      owner: '남편',
+      memo: '월세',
+      isSpecial: false,
+    },
+    {
+      id: 1792990501272,
+      date: '2026-10-25',
+      type: '지출',
+      category: '교통/차량',
+      amount: 6400,
       owner: '아내',
-      memo: '당근마켓 판매',
+      memo: '카카오T일반택시',
       isSpecial: false,
     },
     {
-      id: 3,
-      date: '2026-10-02',
+      id: 1792852096983,
+      date: '2026-10-24',
+      type: '지출',
+      category: '외식/카페',
+      amount: 10500,
+      owner: '공동',
+      memo: '아이스크림',
+      isSpecial: false,
+    },
+    {
+      id: 1792852082459,
+      date: '2026-10-24',
+      type: '지출',
+      category: '외식/카페',
+      amount: 77000,
+      owner: '공동',
+      memo: '딘타이펑',
+      isSpecial: false,
+    },
+    {
+      id: 1792782474750,
+      date: '2026-10-21',
       type: '수입',
       category: '급여',
       amount: 4200000,
       owner: '남편',
-      memo: '10월 급여',
-      isSpecial: false,
-    },
-    {
-      id: 4,
-      date: '2026-10-03',
-      type: '수입',
-      category: '급여',
-      amount: 3600000,
-      owner: '아내',
-      memo: '10월 급여',
-      isSpecial: false,
-    },
-    {
-      id: 5,
-      date: '2026-10-05',
-      type: '지출',
-      category: '주거/통신',
-      amount: 285000,
-      owner: '공동',
-      memo: '아파트 관리비 및 도시가스',
-      isSpecial: false,
-    },
-    {
-      id: 6,
-      date: '2026-10-08',
-      type: '지출',
-      category: '외식/카페',
-      amount: 68000,
-      owner: '공동',
-      memo: '주말 외식 (삼겹살)',
-      isSpecial: false,
-    },
-    {
-      id: 7,
-      date: '2026-10-12',
-      type: '지출',
-      category: '용돈/기타',
-      amount: 150000,
-      owner: '남편',
-      memo: '남편 개인 용돈 지출',
-      isSpecial: true,
-    },
-    {
-      id: 8,
-      date: '2026-10-15',
-      type: '지출',
-      category: '쇼핑/생활',
-      amount: 124000,
-      owner: '아내',
-      memo: '가을 침구류 및 생필품 구매',
-      isSpecial: false,
-    },
-    {
-      id: 9,
-      date: '2026-10-18',
-      type: '지출',
-      category: '문화/여가',
-      amount: 45000,
-      owner: '공동',
-      memo: '영화 관람 및 팝콘',
+      memo: '월급',
       isSpecial: false,
     },
   ]);
@@ -328,89 +322,82 @@ export default function App() {
     {
       id: 1,
       owner: '남편',
-      bank: '신한은행',
-      name: '남편 급여/용돈 통장',
-      balance: 4850000,
+      bank: 'SC제일은행',
+      name: '남편 메인통장',
+      balance: 1000000,
       rate: 0.1,
     },
     {
       id: 2,
       owner: '아내',
       bank: '토스뱅크',
-      name: '아내 파킹/용돈 통장',
+      name: '아내 파킹통장',
       balance: 6200000,
       rate: 2.0,
     },
     {
       id: 3,
       owner: '공동',
-      bank: 'KB국민은행',
-      name: '우리부부 생활비 통장',
-      balance: 2450000,
+      bank: '카카오모임통장',
+      name: '우리부부 생활비',
+      balance: 750000,
       rate: 0.1,
-    },
-    {
-      id: 4,
-      owner: '공동',
-      bank: '주택청약',
-      name: '부부 청약저축 합산',
-      balance: 18500000,
-      rate: 2.8,
     },
   ]);
 
   const [realEstates, setRealEstates] = useState([
-    { id: 1, owner: '공동', name: '송도 아파트 전세보증금', amount: 450000000 },
+    {
+      id: 1792782331058,
+      owner: '남편',
+      name: '송도 아파트 전세보증금',
+      amount: 100000000,
+    },
   ]);
 
   const [loans, setLoans] = useState([
     {
-      id: 1,
-      name: '전세자금대출 (버팀목/시중은행)',
-      amount: 220000000,
-      rate: 3.4,
-      owner: '공동',
-    },
-    {
-      id: 2,
-      name: '마이너스 통장 (비상금)',
-      amount: 15000000,
-      rate: 4.5,
+      id: 1792782313049,
+      name: '토스전세자금대출',
+      amount: 320000000,
+      rate: 4.46,
       owner: '남편',
     },
   ]);
 
   const [stocks, setStocks] = useState([
     {
-      id: 1,
-      name: '삼성전자',
-      code: '005930',
-      shares: 120,
-      avgPrice: 74000,
-      currentPrice: 210000,
-      owner: '남편',
-    },
-    {
       id: 2,
       name: 'TIGER 미국S&P500',
       code: '360750',
-      shares: 400,
+      shares: 300,
       avgPrice: 16500,
-      currentPrice: 24850,
-      owner: '공동',
+      currentPrice: 25605,
+      prevMonthPrice: 25825,
+      owner: '아내',
     },
     {
-      id: 3,
-      name: 'KODEX 미국나스닥100TR',
-      code: '379810',
-      shares: 250,
-      avgPrice: 15200,
-      currentPrice: 23400,
-      owner: '아내',
+      id: 1792781574566,
+      name: 'SK하이닉스',
+      code: '000660',
+      shares: 2,
+      avgPrice: 1436000,
+      currentPrice: 1554000,
+      prevMonthPrice: 1783000,
+      owner: '남편',
+    },
+    {
+      id: 1792782417948,
+      name: 'ACE미국배당다우존스',
+      code: '402970',
+      shares: 2280,
+      avgPrice: 12669,
+      currentPrice: 15175,
+      prevMonthPrice: 14425,
+      owner: '남편',
     },
   ]);
 
-  const [targetAsset, setTargetAsset] = useState(500000000);
+  const [targetAsset, setTargetAsset] = useState(1500000000);
   const [monthlyBudget, setMonthlyBudget] = useState(2500000);
   const [includeSpecial, setIncludeSpecial] = useState(true);
 
@@ -424,16 +411,21 @@ export default function App() {
     amount: '',
     owner: '공동',
     memo: '',
+    note: '',
     isSpecial: false,
   });
 
-  // 카드 결제 문자/카톡 스마트 분석 상태
+  // 카드 결제 문자/카톡/캡처 사진 스마트 분석 상태
   const [smsText, setSmsText] = useState('');
   const [isSmsParsing, setIsSmsParsing] = useState(false);
   const [isBulkSmsModalOpen, setIsBulkSmsModalOpen] = useState(false);
   const [bulkSmsText, setBulkSmsText] = useState('');
+  const [bulkImages, setBulkImages] = useState([]);
   const [parsedBulkItems, setParsedBulkItems] = useState([]);
   const [isBulkSmsLoading, setIsBulkSmsLoading] = useState(false);
+  const [customApiKey, setCustomApiKey] = useState(
+    () => localStorage.getItem('userGeminiApiKey') || ''
+  );
 
   const [accountModal, setAccountModal] = useState({ open: false, item: null });
   const [loanModal, setLoanModal] = useState({ open: false, item: null });
@@ -454,7 +446,7 @@ export default function App() {
   const [selectedTrendIndex, setSelectedTrendIndex] = useState(5);
   const [isStockDetailOpen, setIsStockDetailOpen] = useState(false);
 
-  // --- Firebase 실시간 동기화 ---
+  // --- Firebase 실시간 동기화 (방 문서가 있을 때만 안전하게 읽어오며 절대 초기값으로 덮어쓰지 않음) ---
   useEffect(() => {
     localStorage.setItem('roomCode', roomCode);
     const docRef = doc(db, 'budgets', roomCode);
@@ -463,25 +455,16 @@ export default function App() {
       (docSnap) => {
         if (docSnap.exists()) {
           const data = docSnap.data();
-          if (data.transactions) setTransactions(data.transactions);
-          if (data.accounts) setAccounts(data.accounts);
-          if (data.realEstates) setRealEstates(data.realEstates);
-          if (data.loans) setLoans(data.loans);
-          if (data.stocks) setStocks(data.stocks);
-          if (data.targetAsset) setTargetAsset(data.targetAsset);
-          if (data.monthlyBudget) setMonthlyBudget(data.monthlyBudget);
+          if (Array.isArray(data.transactions)) setTransactions(data.transactions);
+          if (Array.isArray(data.accounts)) setAccounts(data.accounts);
+          if (Array.isArray(data.realEstates)) setRealEstates(data.realEstates);
+          if (Array.isArray(data.loans)) setLoans(data.loans);
+          if (Array.isArray(data.stocks)) setStocks(data.stocks);
+          if (typeof data.targetAsset === 'number') setTargetAsset(data.targetAsset);
+          if (typeof data.monthlyBudget === 'number') setMonthlyBudget(data.monthlyBudget);
           setSyncStatus(`실시간 연동중 (${roomCode})`);
         } else {
-          setDoc(docRef, {
-            transactions,
-            accounts,
-            realEstates,
-            loans,
-            stocks,
-            targetAsset,
-            monthlyBudget,
-          });
-          setSyncStatus(`새 공유방 생성됨 (${roomCode})`);
+          setSyncStatus(`연동 대기중 (${roomCode})`);
         }
       },
       (error) => {
@@ -510,18 +493,28 @@ export default function App() {
     }
   };
 
-  // --- Gemini API 공통 호출 헬퍼 (모델 자동 폴백 지원) ---
-  const callGeminiText = async (promptText, useSearch = false) => {
-    const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
+  // --- Gemini API 공통 호출 헬퍼 (모델 자동 폴백 및 이미지 Vision 지원) ---
+  const getGeminiApiKey = () => {
+    try {
+      if (typeof import.meta !== 'undefined' && import.meta.env?.VITE_GEMINI_API_KEY) {
+        return import.meta.env.VITE_GEMINI_API_KEY;
+      }
+    } catch (e) {}
+    return localStorage.getItem('userGeminiApiKey') || customApiKey || '';
+  };
+
+  const callGeminiText = async (promptText, useSearch = false, imageParts = []) => {
+    const apiKey = getGeminiApiKey();
     if (!apiKey) {
-      throw new Error('VITE_GEMINI_API_KEY 미설정');
+      throw new Error('VITE_GEMINI_API_KEY 미설정 (설정 탭에서 API 키를 입력하거나 Vercel 환경변수를 확인해주세요)');
     }
     const models = ['gemini-3.5-flash-lite', 'gemini-3.8-flash', 'gemini-2.5-flash'];
     let lastErr = null;
     for (const modelName of models) {
       try {
+        const parts = [{ text: promptText }, ...imageParts];
         const bodyObj = {
-          contents: [{ parts: [{ text: promptText }] }],
+          contents: [{ parts }],
         };
         if (useSearch) {
           bodyObj.tools = [{ google_search: {} }];
@@ -551,9 +544,9 @@ export default function App() {
   const [isAiLoading, setIsAiLoading] = useState(false);
 
   const fetchAiReport = async () => {
-    const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
+    const apiKey = getGeminiApiKey();
     if (!apiKey) {
-      alert('Vercel 환경 변수에 VITE_GEMINI_API_KEY가 설정되지 않았습니다.');
+      alert('설정 탭에서 Gemini API 키를 입력하시거나 Vercel 환경 변수(VITE_GEMINI_API_KEY)를 확인해 주세요.');
       return;
     }
     setIsAiLoading(true);
@@ -930,8 +923,115 @@ export default function App() {
         amount: amount || '',
         owner: ownerFilter === '전체' ? '공동' : ownerFilter,
         memo: store || '카드 결제',
+        note: '',
       };
     });
+  };
+
+  // 이미지 파일을 Base64 inline_data로 변환하는 헬퍼
+  const fileToGenerativePart = (file) =>
+    new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const dataUrl = String(reader.result || '');
+        const base64Data = dataUrl.split(',')[1] || '';
+        resolve({
+          inline_data: {
+            mime_type: file.type || 'image/jpeg',
+            data: base64Data,
+          },
+          previewUrl: dataUrl,
+          name: file.name || '캡처 이미지',
+        });
+      };
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+
+  // 단건 모달에서 캡처 이미지 업로드 시 자동 분석
+  const handleSingleImageUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    e.target.value = '';
+
+    if (!getGeminiApiKey()) {
+      alert('캡처 사진 AI 분석을 위해 [설정] 탭 하단에서 Gemini API 키를 등록해 주세요.');
+      return;
+    }
+
+    setIsSmsParsing(true);
+    try {
+      const part = await fileToGenerativePart(file);
+      const prompt = `이 결제 내역/영수증 캡처 이미지를 분석해서 가장 핵심이 되는 결제 내역 1건을 JSON 객체로만 답해줘. (만약 여러 건이면 첫 번째 건 또는 합계 건)
+허용 카테고리 목록: ${ALL_CATEGORIES.join(', ')}
+- 식당, 밥집, 고깃집, 분식, 치킨, 배달, 카페, 빵집 등은 "외식/카페"
+- 마트, 편의점, 식자재, 정육점, 반찬가게 등은 "식비"
+- 통신사, 관리비, 가스, 전기, 보험은 "주거/통신"
+- 주유소, 택시, 기차, 버스, 주차, 하이패스는 "교통/차량"
+- 약국, 병원, 의원, 치과, 한의원은 "의료/건강"
+- 온라인쇼핑(쿠팡, 네이버페이 등), 백화점, 다이소, 올리브영, 미용실 등은 "쇼핑/생활"
+
+출력 형식 (순수 JSON만 출력):
+{"date": "YYYY-MM-DD (연도가 없으면 ${currentYear}년 기준, 날짜가 안 보이면 ${
+        selectedDate || todayInfo.dateStr
+      })", "type": "지출 또는 수입", "amount": 숫자만, "memo": "가맹점명/사용처 깔끔하게", "note": "할부/할인 등 특이사항이 있으면 짧게 아니면 빈문자열", "category": "위 허용 카테고리 중 하나"}`;
+
+      const aiResText = await callGeminiText(prompt, false, [
+        { inline_data: part.inline_data },
+      ]);
+      const jsonMatch = aiResText.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        const aiParsed = JSON.parse(jsonMatch[0]);
+        setTxForm((prev) => ({
+          ...prev,
+          date:
+            aiParsed.date && /^\d{4}-\d{2}-\d{2}$/.test(String(aiParsed.date))
+              ? aiParsed.date
+              : prev.date,
+          type: aiParsed.type === '수입' ? '수입' : '지출',
+          category: ALL_CATEGORIES.includes(aiParsed.category)
+            ? aiParsed.category
+            : classifyKoreanMerchant(aiParsed.memo || ''),
+          amount: aiParsed.amount
+            ? String(Number(String(aiParsed.amount).replace(/,/g, '')))
+            : prev.amount,
+          memo: aiParsed.memo || prev.memo,
+          note: aiParsed.note || prev.note || '',
+        }));
+      }
+    } catch (err) {
+      console.error('이미지 단건 분석 오류:', err);
+      alert('캡처 이미지 분석에 실패했습니다: ' + (err.message || err));
+    } finally {
+      setIsSmsParsing(false);
+    }
+  };
+
+  // 일괄 모달에서 캡처 이미지 여러 장 추가
+  const handleBulkImageSelect = async (e) => {
+    const files = Array.from(e.target.files || []);
+    if (files.length === 0) return;
+    e.target.value = '';
+    try {
+      const converted = await Promise.all(files.map(fileToGenerativePart));
+      setBulkImages((prev) => [...prev, ...converted]);
+    } catch (err) {
+      console.error('이미지 로드 실패:', err);
+    }
+  };
+
+  // 클립보드 붙여넣기(Ctrl+V)로 캡처 이미지 바로 추가 지원
+  const handleBulkPaste = async (e) => {
+    const items = Array.from(e.clipboardData?.items || []);
+    const imageFiles = items
+      .filter((it) => it.type.startsWith('image/'))
+      .map((it) => it.getAsFile())
+      .filter(Boolean);
+    if (imageFiles.length > 0) {
+      e.preventDefault();
+      const converted = await Promise.all(imageFiles.map(fileToGenerativePart));
+      setBulkImages((prev) => [...prev, ...converted]);
+    }
   };
 
   // 단건 문자 붙여넣기 분석 (내역 입력 모달 내)
@@ -944,7 +1044,7 @@ export default function App() {
       let finalData = { ...firstParsed };
 
       // 2차: Gemini API 키가 있으면 애매한 식당/상점 이름까지 AI가 정확히 카테고리 분류
-      if (import.meta.env.VITE_GEMINI_API_KEY) {
+      if (getGeminiApiKey()) {
         try {
           const prompt = `다음 한국 카드 결제 문자(또는 지출 메모)를 분석해서 JSON 객체로만 답해줘.
 허용 카테고리 목록: ${EXPENSE_CATEGORIES.join(', ')}
@@ -1001,17 +1101,76 @@ ${smsText.trim()}
     }
   };
 
-  // 여러 건의 카드 문자 일괄 분석 핸들러
+  // 여러 건의 카드 문자 및 캡처 이미지 일괄 분석 핸들러
   const handleAnalyzeBulkSms = async () => {
-    if (!bulkSmsText.trim()) return;
+    if (!bulkSmsText.trim() && bulkImages.length === 0) return;
     setIsBulkSmsLoading(true);
     try {
-      let items = parseRawSmsBlocks(bulkSmsText);
+      let combinedItems = [];
 
-      // Gemini API가 설정되어 있으면 전체 가맹점 카테고리를 한 번에 정밀 보정
-      if (import.meta.env.VITE_GEMINI_API_KEY && items.length > 0) {
-        try {
-          const prompt = `다음 카드 결제 문자 내역들을 분석해서 JSON 배열로만 답해줘.
+      // 1) 캡처 이미지가 있는 경우 Gemini Vision으로 내역 추출
+      if (bulkImages.length > 0) {
+        if (!getGeminiApiKey()) {
+          alert(
+            '캡처 사진 분석을 위해 [설정] 탭 하단에서 Gemini API 키를 입력하거나 Vercel 환경변수를 설정해 주세요.'
+          );
+        } else {
+          try {
+            const imagePrompt = `첨부된 카드사 앱 결제내역, 은행 입출금 내역, 영수증, 또는 결제 알림 캡처 이미지에서 모든 거래 내역을 빠짐없이 추출해서 JSON 배열로만 답해줘.
+허용 카테고리 목록: ${ALL_CATEGORIES.join(', ')}
+- 동네 식당, 음식점, 술집, 카페, 치킨, 배달 등은 모두 "외식/카페"로 분류해.
+- 마트, 편의점, 식자재, 정육점, 슈퍼마켓은 "식비"로 분류해.
+- LGU+, SKT, KT, 관리비, 도시가스, 전기요금, 보험은 "주거/통신"으로 분류해.
+- 주유소, 택시, 대중교통, 기차, 주차는 "교통/차량"으로 분류해.
+- 약국, 병원, 의원, 치과, 헬스장은 "의료/건강"으로 분류해.
+- 쿠팡, 네이버페이, 백화점, 다이소, 올리브영, 의류, 미용실 등은 "쇼핑/생활"로 분류해.
+- 취소된 결제건이나 잔액 표시는 제외하고 실제 승인/출금/입금 내역만 추출해.
+
+출력 JSON 배열 형식 (순수 JSON 배열만 출력):
+[{"date": "YYYY-MM-DD (연도가 안 보이면 ${currentYear}년 기준, 날짜가 전혀 없으면 ${
+              selectedDate || todayInfo.dateStr
+            })", "type": "지출 또는 수입", "amount": 숫자만, "memo": "가맹점명/사용처 깔끔하게", "note": "", "category": "위 허용 카테고리 중 하나"}]`;
+
+            const inlineParts = bulkImages.map((img) => ({
+              inline_data: img.inline_data,
+            }));
+            const aiImgText = await callGeminiText(imagePrompt, false, inlineParts);
+            const arrMatch = aiImgText.match(/\[[\s\S]*\]/);
+            if (arrMatch) {
+              const aiArr = JSON.parse(arrMatch[0]);
+              if (Array.isArray(aiArr)) {
+                const mappedImgItems = aiArr.map((it) => ({
+                  date:
+                    it.date && /^\d{4}-\d{2}-\d{2}$/.test(String(it.date))
+                      ? it.date
+                      : selectedDate || todayInfo.dateStr,
+                  type: it.type === '수입' ? '수입' : '지출',
+                  category: ALL_CATEGORIES.includes(it.category)
+                    ? it.category
+                    : classifyKoreanMerchant(it.memo),
+                  amount: Number(String(it.amount || 0).replace(/,/g, '')),
+                  owner: ownerFilter === '전체' ? '공동' : ownerFilter,
+                  memo: it.memo || '카드 결제',
+                  note: it.note || '',
+                  isSpecial: false,
+                }));
+                combinedItems.push(...mappedImgItems);
+              }
+            }
+          } catch (e) {
+            console.error('캡처 이미지 AI 분석 오류:', e);
+            alert('캡처 이미지 분석 중 오류가 발생했습니다: ' + (e.message || e));
+          }
+        }
+      }
+
+      // 2) 텍스트(문자/카톡)가 입력된 경우 분석
+      if (bulkSmsText.trim()) {
+        let textItems = parseRawSmsBlocks(bulkSmsText);
+
+        if (getGeminiApiKey() && textItems.length > 0) {
+          try {
+            const prompt = `다음 카드 결제 문자 내역들을 분석해서 JSON 배열로만 답해줘.
 허용 카테고리: ${EXPENSE_CATEGORIES.join(', ')}
 - 동네 식당, 음식점, 술집, 카페, 치킨, 배달 등은 모두 "외식/카페"로 분류해.
 - LGU+, SKT, KT, 관리비, 도시가스, 보험 등은 "주거/통신"으로 분류해.
@@ -1026,33 +1185,36 @@ ${bulkSmsText.trim()}
 출력 JSON 배열 형식:
 [{"date": "YYYY-MM-DD (연도 없으면 ${currentYear}년)", "amount": 숫자, "memo": "가맹점명", "category": "허용 카테고리 중 하나"}]`;
 
-          const aiText = await callGeminiText(prompt, false);
-          const arrMatch = aiText.match(/\[[\s\S]*\]/);
-          if (arrMatch) {
-            const aiArr = JSON.parse(arrMatch[0]);
-            if (Array.isArray(aiArr) && aiArr.length > 0) {
-              items = aiArr.map((it) => ({
-                date:
-                  it.date && /^\d{4}-\d{2}-\d{2}$/.test(it.date)
-                    ? it.date
-                    : selectedDate || todayInfo.dateStr,
-                type: '지출',
-                category: EXPENSE_CATEGORIES.includes(it.category)
-                  ? it.category
-                  : classifyKoreanMerchant(it.memo),
-                amount: Number(String(it.amount || 0).replace(/,/g, '')),
-                owner: ownerFilter === '전체' ? '공동' : ownerFilter,
-                memo: it.memo || '카드 결제',
-                isSpecial: false,
-              }));
+            const aiText = await callGeminiText(prompt, false);
+            const arrMatch = aiText.match(/\[[\s\S]*\]/);
+            if (arrMatch) {
+              const aiArr = JSON.parse(arrMatch[0]);
+              if (Array.isArray(aiArr) && aiArr.length > 0) {
+                textItems = aiArr.map((it) => ({
+                  date:
+                    it.date && /^\d{4}-\d{2}-\d{2}$/.test(it.date)
+                      ? it.date
+                      : selectedDate || todayInfo.dateStr,
+                  type: '지출',
+                  category: EXPENSE_CATEGORIES.includes(it.category)
+                    ? it.category
+                    : classifyKoreanMerchant(it.memo),
+                  amount: Number(String(it.amount || 0).replace(/,/g, '')),
+                  owner: ownerFilter === '전체' ? '공동' : ownerFilter,
+                  memo: it.memo || '카드 결제',
+                  note: '',
+                  isSpecial: false,
+                }));
+              }
             }
+          } catch (e) {
+            console.warn('일괄 문자 AI 보정 실패, 내장 파서 결과 사용:', e);
           }
-        } catch (e) {
-          console.warn('일괄 문자 AI 보정 실패, 내장 파서 결과 사용:', e);
         }
+        combinedItems.push(...textItems);
       }
 
-      setParsedBulkItems(items.filter((i) => Number(i.amount) > 0));
+      setParsedBulkItems(combinedItems.filter((i) => Number(i.amount) > 0));
     } finally {
       setIsBulkSmsLoading(false);
     }
@@ -1064,11 +1226,12 @@ ${bulkSmsText.trim()}
     const newTxs = parsedBulkItems.map((item, idx) => ({
       id: now + idx,
       date: item.date,
-      type: '지출',
+      type: item.type || '지출',
       category: item.category,
       amount: Number(item.amount),
       owner: item.owner || '공동',
       memo: item.memo,
+      note: item.note || '',
       isSpecial: false,
     }));
     const updated = [...newTxs, ...transactions];
@@ -1076,8 +1239,9 @@ ${bulkSmsText.trim()}
     syncToCloud({ transactions: updated });
     setIsBulkSmsModalOpen(false);
     setBulkSmsText('');
+    setBulkImages([]);
     setParsedBulkItems([]);
-    alert(`총 ${newTxs.length}건의 카드 결제 내역이 가계부에 등록되었습니다!`);
+    alert(`총 ${newTxs.length}건의 내역이 가계부에 등록되었습니다!`);
   };
 
   // --- 명의 필터링 헬퍼 ---
@@ -1302,6 +1466,7 @@ ${bulkSmsText.trim()}
       amount: '',
       owner: ownerFilter === '전체' ? '공동' : ownerFilter,
       memo: '',
+      note: '',
       isSpecial: false,
     });
     setIsTxModalOpen(true);
@@ -1310,7 +1475,7 @@ ${bulkSmsText.trim()}
   const openEditTxModal = (tx) => {
     setEditingTx(tx);
     setSmsText('');
-    setTxForm({ ...tx, amount: String(tx.amount) });
+    setTxForm({ ...tx, note: tx.note || '', amount: String(tx.amount) });
     setIsTxModalOpen(true);
   };
 
@@ -1455,20 +1620,44 @@ ${bulkSmsText.trim()}
     syncToCloud({ stocks: updated });
   };
 
-  // 평단가 계산기 대상 종목
+  // 평단가 계산기 대상 종목 및 포트폴리오 실제 반영 핸들러
   const targetCalcStock =
     stocks.find((s) => s.id === Number(calcStockId)) || stocks[0];
+  const parsedAddShares = Number(addShares || 0);
+  const parsedAddPrice = Number(addPrice || 0);
   const newTotalShares = targetCalcStock
-    ? targetCalcStock.shares + Number(addShares || 0)
+    ? targetCalcStock.shares + parsedAddShares
     : 0;
   const newAvgPrice =
     targetCalcStock && newTotalShares > 0
       ? Math.round(
           (targetCalcStock.shares * targetCalcStock.avgPrice +
-            Number(addShares || 0) * Number(addPrice || 0)) /
+            parsedAddShares * parsedAddPrice) /
             newTotalShares
         )
       : 0;
+
+  const handleApplyAddBuyToPortfolio = () => {
+    if (!targetCalcStock) return;
+    if (parsedAddShares <= 0 || parsedAddPrice <= 0) {
+      alert('추가 매수 수량과 매수 단가를 정확히 입력해 주세요.');
+      return;
+    }
+    const updated = stocks.map((s) =>
+      s.id === targetCalcStock.id
+        ? {
+            ...s,
+            shares: newTotalShares,
+            avgPrice: newAvgPrice,
+          }
+        : s
+    );
+    setStocks(updated);
+    syncToCloud({ stocks: updated });
+    alert(
+      `[${targetCalcStock.name}] 추가 매수(${parsedAddShares.toLocaleString()}주 · ${parsedAddPrice.toLocaleString()}원)가 포트폴리오에 반영되었습니다!\n• 변경 후 보유수량: ${newTotalShares.toLocaleString()}주\n• 변경 후 평단가: ${newAvgPrice.toLocaleString()}원`
+    );
+  };
 
   return (
     <div className="min-h-screen bg-[#f8fafc] text-slate-800 pb-24 font-sans">
@@ -1705,12 +1894,13 @@ ${bulkSmsText.trim()}
                   <button
                     onClick={() => {
                       setBulkSmsText('');
+                      setBulkImages([]);
                       setParsedBulkItems([]);
                       setIsBulkSmsModalOpen(true);
                     }}
                     className="text-[11px] bg-slate-100 text-slate-700 px-3 py-1.5 rounded-xl font-bold hover:bg-slate-200 transition flex items-center gap-1"
                   >
-                    <MessageSquarePlus size={13} /> 문자 일괄입력
+                    <Camera size={13} /> 캡처·문자 일괄입력
                   </button>
                   <button
                     onClick={() => openAddTxModal(selectedDate)}
@@ -1751,6 +1941,7 @@ ${bulkSmsText.trim()}
                           </div>
                           <span className="text-[11px] text-gray-400 font-medium">
                             {t.category}
+                            {t.note ? ` · ${t.note}` : ''}
                           </span>
                         </div>
                         <div className="flex items-center gap-2">
@@ -2704,16 +2895,26 @@ ${bulkSmsText.trim()}
                     />
                   </div>
                   {targetCalcStock && (
-                    <div className="text-xs text-gray-700 font-medium flex justify-between bg-white/80 px-3 py-2 rounded-lg">
-                      <span>
-                        기존 평단:{' '}
-                        <b>{targetCalcStock.avgPrice.toLocaleString()}원</b> (
-                        {targetCalcStock.shares}주)
-                      </span>
-                      <span className="text-emerald-700 font-black">
-                        ➔ 예상 평단: {newAvgPrice.toLocaleString()}원 (총{' '}
-                        {newTotalShares}주)
-                      </span>
+                    <div className="flex flex-col gap-2">
+                      <div className="text-xs text-gray-700 font-medium flex justify-between items-center bg-white/80 px-3 py-2 rounded-lg">
+                        <span>
+                          기존 평단:{' '}
+                          <b>{targetCalcStock.avgPrice.toLocaleString()}원</b> (
+                          {targetCalcStock.shares}주)
+                        </span>
+                        <span className="text-emerald-700 font-black">
+                          ➔ 예상 평단: {newAvgPrice.toLocaleString()}원 (총{' '}
+                          {newTotalShares}주)
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={handleApplyAddBuyToPortfolio}
+                        className="w-full bg-slate-900 hover:bg-slate-800 text-white py-2 rounded-xl text-xs font-extrabold transition shadow-sm flex items-center justify-center gap-1.5"
+                      >
+                        <Check size={14} className="text-emerald-400" />
+                        추가 매수 내역 포트폴리오에 반영하기
+                      </button>
                     </div>
                   )}
                 </div>
@@ -2833,6 +3034,28 @@ ${bulkSmsText.trim()}
                 </div>
               ))}
             </div>
+
+            {/* AI 캡처 이미지/문자 분석용 Gemini API 키 설정 (로컬/브라우저 저장) */}
+            <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100 flex flex-col gap-2.5">
+              <span className="text-sm font-black text-gray-900">
+                🤖 AI 캡처·리포트용 Gemini API 키
+              </span>
+              <p className="text-xs text-gray-500">
+                Vercel 배포 환경변수가 없을 때(로컬 미리보기 등) 캡처 사진 자동 정리를 사용하려면 키를 입력해 주세요.
+              </p>
+              <div className="flex gap-2">
+                <input
+                  type="password"
+                  placeholder="AIzaSy... (비워두면 기본 환경변수 사용)"
+                  value={customApiKey}
+                  onChange={(e) => {
+                    setCustomApiKey(e.target.value);
+                    localStorage.setItem('userGeminiApiKey', e.target.value.trim());
+                  }}
+                  className="flex-1 border border-gray-200 rounded-xl px-3 py-2 text-xs font-bold bg-[#f8fbfa]"
+                />
+              </div>
+            </div>
           </div>
         )}
       </main>
@@ -2890,7 +3113,7 @@ ${bulkSmsText.trim()}
       </nav>
 
       {/* ==================== 모달창 영역 ==================== */}
-      {/* 1) 영수증 입력/수정 모달 (카드 결제 문자 자동분석 포함) */}
+      {/* 1) 영수증 입력/수정 모달 (캡처 사진 & 카드 결제 문자 자동분석 포함) */}
       {isTxModalOpen && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
           <form
@@ -2906,26 +3129,38 @@ ${bulkSmsText.trim()}
               </button>
             </div>
 
-            {/* 추천 4) 카드 결제 문자/카톡 붙여넣기 자동 완성 박스 */}
+            {/* 추천 4) 캡처 사진 또는 카드 결제 문자 자동 완성 박스 */}
             {!editingTx && (
-              <div className="bg-slate-50 border border-slate-200/80 rounded-2xl p-3.5 flex flex-col gap-2">
-                <div className="flex justify-between items-center">
-                  <span className="text-[11px] font-extrabold text-slate-800 flex items-center gap-1.5">
-                    <Sparkles size={13} className="text-emerald-600" /> 결제 알림 문자 자동 입력
+              <div className="bg-slate-50 border border-slate-200/80 rounded-2xl p-3 flex flex-col gap-2">
+                <div className="flex justify-between items-center gap-1.5">
+                  <span className="text-[11px] font-extrabold text-slate-800 flex items-center gap-1 whitespace-nowrap shrink-0">
+                    <Sparkles size={12} className="text-emerald-600 shrink-0" /> 캡처·문자 자동입력
                   </span>
-                  <button
-                    type="button"
-                    onClick={handleAnalyzeSingleSms}
-                    disabled={isSmsParsing || !smsText.trim()}
-                    className="text-[11px] bg-slate-900 text-white px-3 py-1 rounded-xl font-bold hover:bg-slate-800 disabled:opacity-40 transition"
-                  >
-                    {isSmsParsing ? 'AI 분석중...' : '⚡ 자동 채우기'}
-                  </button>
+                  <div className="flex items-center gap-1 shrink-0">
+                    <label className="cursor-pointer text-[11px] bg-white border border-slate-200 text-slate-700 px-2 py-1 rounded-lg font-bold hover:bg-slate-100 transition flex items-center gap-1 whitespace-nowrap shrink-0">
+                      <Camera size={12} className="text-emerald-600 shrink-0" />
+                      <span>사진 선택</span>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={handleSingleImageUpload}
+                        className="hidden"
+                      />
+                    </label>
+                    <button
+                      type="button"
+                      onClick={handleAnalyzeSingleSms}
+                      disabled={isSmsParsing || !smsText.trim()}
+                      className="text-[11px] bg-slate-900 text-white px-2.5 py-1 rounded-lg font-bold hover:bg-slate-800 disabled:opacity-40 transition whitespace-nowrap shrink-0"
+                    >
+                      {isSmsParsing ? 'AI 분석중...' : '⚡ 자동채우기'}
+                    </button>
+                  </div>
                 </div>
                 <textarea
                   value={smsText}
                   onChange={(e) => setSmsText(e.target.value)}
-                  placeholder="결제 알림 문자나 메모(예: 스타벅스 6,500원)를 붙여넣고 [자동 채우기]를 누르세요."
+                  placeholder="영수증·결제 캡처 사진을 올리거나 알림 문자를 붙여넣으세요."
                   rows={2}
                   className="w-full bg-white border border-slate-200 rounded-xl p-2.5 text-xs font-medium resize-none focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition"
                 />
@@ -2957,7 +3192,7 @@ ${bulkSmsText.trim()}
               type="date"
               value={txForm.date}
               onChange={(e) => setTxForm({ ...txForm, date: e.target.value })}
-              className="border rounded-xl px-3 py-2 text-xs font-bold"
+              className="border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-slate-800"
               required
             />
             <div className="grid grid-cols-2 gap-2">
@@ -2966,7 +3201,7 @@ ${bulkSmsText.trim()}
                 onChange={(e) =>
                   setTxForm({ ...txForm, owner: e.target.value })
                 }
-                className="border rounded-xl px-3 py-2 text-xs font-bold"
+                className="border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-slate-800"
               >
                 <option value="공동">공동</option>
                 <option value="남편">남편</option>
@@ -2977,7 +3212,7 @@ ${bulkSmsText.trim()}
                 onChange={(e) =>
                   setTxForm({ ...txForm, category: e.target.value })
                 }
-                className="border rounded-xl px-3 py-2 text-xs font-bold"
+                className="border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-slate-800"
               >
                 {ALL_CATEGORIES.map((c) => (
                   <option key={c} value={c}>
@@ -2991,16 +3226,16 @@ ${bulkSmsText.trim()}
               placeholder="금액 (원)"
               value={txForm.amount}
               onChange={(e) => setTxForm({ ...txForm, amount: e.target.value })}
-              className="border rounded-xl px-3 py-2 text-xs font-extrabold"
+              className="border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-slate-800 placeholder:font-medium placeholder:text-slate-400"
               required
             />
             <input
               type="text"
-              placeholder="메모 (예: 마트 장보기, 식당 이름)"
+              placeholder="내용 (예: 마트 장보기, 식당 이름)"
               value={txForm.memo}
               onChange={(e) => {
                 const newMemo = e.target.value;
-                // 메모를 직접 입력할 때도 자동으로 식당/통신비/교통비 등 카테고리 추론
+                // 내용을 직접 입력할 때도 자동으로 식당/통신비/교통비 등 카테고리 추론
                 const guessed = classifyKoreanMerchant(newMemo);
                 setTxForm((prev) => ({
                   ...prev,
@@ -3009,7 +3244,14 @@ ${bulkSmsText.trim()}
                     guessed !== '용돈/기타' ? guessed : prev.category,
                 }));
               }}
-              className="border rounded-xl px-3 py-2 text-xs font-bold"
+              className="border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-slate-800 placeholder:font-medium placeholder:text-slate-400"
+            />
+            <input
+              type="text"
+              placeholder="특이사항 (선택)"
+              value={txForm.note || ''}
+              onChange={(e) => setTxForm({ ...txForm, note: e.target.value })}
+              className="border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-slate-800 placeholder:font-medium placeholder:text-slate-400"
             />
             <label className="flex items-center gap-2 text-xs font-bold text-gray-600">
               <input
@@ -3032,72 +3274,189 @@ ${bulkSmsText.trim()}
         </div>
       )}
 
-      {/* 1-2) 카드 결제 문자 여러 건 일괄 입력 모달 */}
+      {/* 1-2) 캡처 이미지 및 카드 결제 문자 여러 건 일괄 입력 모달 */}
       {isBulkSmsModalOpen && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div
+          onPaste={handleBulkPaste}
+          className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+        >
           <div className="bg-white rounded-3xl p-6 w-full max-w-md flex flex-col gap-3.5 shadow-2xl max-h-[90vh] overflow-y-auto text-xs border border-slate-100">
             <div className="flex justify-between items-center border-b border-slate-100 pb-2.5">
               <span className="font-black text-sm text-slate-900 flex items-center gap-1.5">
-                <Sparkles size={16} className="text-emerald-600" /> 결제 알림 문자 일괄 입력
+                <Sparkles size={16} className="text-emerald-600" /> 캡처 사진 · 결제 문자 일괄 입력
               </span>
               <button onClick={() => setIsBulkSmsModalOpen(false)} className="text-slate-400 hover:text-slate-600">
                 <X size={18} />
               </button>
             </div>
             <p className="text-slate-500 leading-relaxed font-medium">
-              카드 승인 문자나 모바일 뱅킹 알림 내역을 한꺼번에 붙여넣으시면, 날짜·금액·사용처·카테고리를 스마트하게 자동 분류합니다.
+              카드 앱·통장 내역 캡처 사진을 올리거나(Ctrl+V 붙여넣기 가능) 승인 문자를 붙여넣으시면 자동으로 리스트로 정리합니다.
             </p>
+
+            {/* 캡처 이미지 업로드 영역 */}
+            <div className="flex flex-col gap-2">
+              <label className="cursor-pointer border-2 border-dashed border-slate-200 hover:border-emerald-500 bg-slate-50/70 hover:bg-emerald-50/30 rounded-2xl p-3.5 flex flex-col items-center justify-center gap-1.5 transition">
+                <div className="w-8 h-8 rounded-full bg-white shadow-sm flex items-center justify-center text-emerald-600">
+                  <ImageIcon size={16} />
+                </div>
+                <span className="font-extrabold text-slate-700 text-xs">
+                  결제 내역 캡처본 사진 추가 (여러 장 가능)
+                </span>
+                <span className="text-[10px] text-slate-400 font-medium">
+                  클릭해서 사진 선택 또는 화면 캡처 후 Ctrl+V 붙여넣기
+                </span>
+                <input
+                  type="file"
+                  accept="image/*"
+                  multiple
+                  onChange={handleBulkImageSelect}
+                  className="hidden"
+                />
+              </label>
+
+              {bulkImages.length > 0 && (
+                <div className="flex gap-2 overflow-x-auto py-1">
+                  {bulkImages.map((img, idx) => (
+                    <div
+                      key={idx}
+                      className="relative w-16 h-16 rounded-xl overflow-hidden border border-slate-200 shrink-0 group"
+                    >
+                      <img
+                        src={img.previewUrl}
+                        alt={img.name}
+                        className="w-full h-full object-cover"
+                      />
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setBulkImages((prev) =>
+                            prev.filter((_, i) => i !== idx)
+                          )
+                        }
+                        className="absolute top-1 right-1 bg-black/70 text-white rounded-full p-0.5 hover:bg-red-500 transition"
+                      >
+                        <X size={11} />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
             <textarea
               value={bulkSmsText}
               onChange={(e) => setBulkSmsText(e.target.value)}
-              rows={6}
-              placeholder={`[입력 예시]\n[신한체크] 10/26 13:20 현대백화점 54,000원 승인\n[KB국민] 10/26 20:15 쿠팡 38,500원\n스타벅스 아메리카노 4,500원 결제\n\n* 여러 건을 한 번에 복사해 넣으셔도 자동으로 깔끔하게 정리됩니다.`}
+              rows={4}
+              placeholder={`[문자 입력 예시 - 사진만 올리실 경우 비워두셔도 됩니다]\n[신한체크] 11/03 13:20 현대백화점 54,000원 승인\n[KB국민] 11/03 20:15 쿠팡 38,500원`}
               className="w-full border border-slate-200 rounded-2xl p-3 text-xs font-medium resize-y focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500"
             />
             <button
               type="button"
               onClick={handleAnalyzeBulkSms}
-              disabled={isBulkSmsLoading || !bulkSmsText.trim()}
+              disabled={
+                isBulkSmsLoading ||
+                (!bulkSmsText.trim() && bulkImages.length === 0)
+              }
               className="bg-slate-900 text-white py-2.5 rounded-xl font-extrabold hover:bg-slate-800 disabled:opacity-40 transition shadow-sm"
             >
               {isBulkSmsLoading
-                ? '🤖 가맹점 업종 분석 중...'
-                : '🔍 내역 스마트 분석하기'}
+                ? '🤖 캡처·문자 내역 AI 분석 및 리스트 정리 중...'
+                : '🔍 내역 자동 분석해서 리스트 정리하기'}
             </button>
 
             {parsedBulkItems.length > 0 && (
               <div className="flex flex-col gap-2 pt-2 border-t border-gray-100">
-                <span className="font-extrabold text-gray-800">
-                  분석 결과 ({parsedBulkItems.length}건) - 카테고리 수정 가능
-                </span>
+                <div className="flex justify-between items-center">
+                  <span className="font-extrabold text-gray-800">
+                    자동 정리된 리스트 ({parsedBulkItems.length}건)
+                  </span>
+                  <span className="text-[10px] text-slate-400 font-medium">
+                    내용·특이사항·카테고리 수정 가능
+                  </span>
+                </div>
                 {parsedBulkItems.map((item, idx) => (
                   <div
                     key={idx}
-                    className="flex items-center justify-between gap-2 bg-[#f8fbfa] p-2.5 rounded-xl border border-gray-100"
+                    className="flex flex-col gap-1.5 bg-[#f8fbfa] p-3 rounded-2xl border border-gray-100"
                   >
-                    <div className="flex flex-col flex-1 min-w-0">
-                      <span className="font-extrabold text-gray-900 truncate">
-                        {item.memo}
-                      </span>
-                      <span className="text-[10px] text-gray-400">
-                        {item.date} · {Number(item.amount).toLocaleString()}원
-                      </span>
+                    <div className="flex items-center justify-between gap-2">
+                      <input
+                        type="text"
+                        value={item.memo}
+                        onChange={(e) => {
+                          const next = [...parsedBulkItems];
+                          next[idx] = { ...next[idx], memo: e.target.value };
+                          setParsedBulkItems(next);
+                        }}
+                        className="font-bold text-slate-800 placeholder:font-medium placeholder:text-slate-400 bg-white border border-slate-200 rounded-lg px-2 py-1 text-xs flex-1 min-w-0"
+                        placeholder="내용"
+                      />
+                      <select
+                        value={item.category}
+                        onChange={(e) => {
+                          const next = [...parsedBulkItems];
+                          next[idx] = {
+                            ...next[idx],
+                            category: e.target.value,
+                          };
+                          setParsedBulkItems(next);
+                        }}
+                        className="border border-slate-200 rounded-lg px-2 py-1 font-bold text-xs text-slate-800 bg-white shrink-0"
+                      >
+                        {ALL_CATEGORIES.map((c) => (
+                          <option key={c} value={c}>
+                            {c}
+                          </option>
+                        ))}
+                      </select>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setParsedBulkItems((prev) =>
+                            prev.filter((_, i) => i !== idx)
+                          )
+                        }
+                        className="text-slate-400 hover:text-red-500 p-1"
+                      >
+                        <Trash2 size={13} />
+                      </button>
                     </div>
-                    <select
-                      value={item.category}
-                      onChange={(e) => {
-                        const next = [...parsedBulkItems];
-                        next[idx] = { ...next[idx], category: e.target.value };
-                        setParsedBulkItems(next);
-                      }}
-                      className="border rounded-lg px-2 py-1 font-bold text-xs bg-white"
-                    >
-                      {EXPENSE_CATEGORIES.map((c) => (
-                        <option key={c} value={c}>
-                          {c}
-                        </option>
-                      ))}
-                    </select>
+                    <div className="flex items-center gap-1.5">
+                      <input
+                        type="date"
+                        value={item.date}
+                        onChange={(e) => {
+                          const next = [...parsedBulkItems];
+                          next[idx] = { ...next[idx], date: e.target.value };
+                          setParsedBulkItems(next);
+                        }}
+                        className="text-xs text-slate-800 bg-white border border-slate-200 rounded-lg px-2 py-1 font-bold"
+                      />
+                      <input
+                        type="number"
+                        value={item.amount}
+                        onChange={(e) => {
+                          const next = [...parsedBulkItems];
+                          next[idx] = {
+                            ...next[idx],
+                            amount: Number(e.target.value),
+                          };
+                          setParsedBulkItems(next);
+                        }}
+                        className="text-xs text-slate-800 bg-white border border-slate-200 rounded-lg px-2 py-1 font-bold w-24 text-right placeholder:font-medium placeholder:text-slate-400"
+                      />
+                      <input
+                        type="text"
+                        value={item.note || ''}
+                        onChange={(e) => {
+                          const next = [...parsedBulkItems];
+                          next[idx] = { ...next[idx], note: e.target.value };
+                          setParsedBulkItems(next);
+                        }}
+                        placeholder="특이사항 (선택)"
+                        className="text-xs text-slate-800 bg-white border border-slate-200 rounded-lg px-2 py-1 font-bold placeholder:font-medium placeholder:text-slate-400 flex-1 min-w-0"
+                      />
+                    </div>
                   </div>
                 ))}
                 <button
