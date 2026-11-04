@@ -26,6 +26,7 @@ import {
   BarChart2,
   Image as ImageIcon,
   Camera,
+  Search,
 } from 'lucide-react';
 
 // --- Firebase SDK 임포트 및 초기화 ---
@@ -87,6 +88,26 @@ const EXPENSE_CATEGORIES = [
 ];
 
 const ALL_CATEGORIES = [...EXPENSE_CATEGORIES, '급여', '부수입', '이체/카드대금'];
+
+// 원터치 추천 검색 태그 목록 (그림 없이 깔끔하고 세련된 미니멀 텍스트 칩)
+const QUICK_FILTER_TAGS = [
+  { id: '외식/카페', label: '외식·카페', type: 'category', value: '외식/카페' },
+  { id: '식비', label: '식비', type: 'category', value: '식비' },
+  { id: '쇼핑/생활', label: '쇼핑·생활', type: 'category', value: '쇼핑/생활' },
+  { id: '의료/건강', label: '병원·약국', type: 'category', value: '의료/건강' },
+  { id: '교통/차량', label: '교통·차량', type: 'category', value: '교통/차량' },
+  { id: 'high50k', label: '5만원 이상', type: 'minAmount', value: 50000 },
+];
+
+// 날짜를 다정한 한국어 요일 표기로 변환 (예: "11월 5일 목요일")
+function formatFriendlyDate(dateStr, short = false) {
+  if (!dateStr || !/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) return dateStr;
+  const [y, m, d] = dateStr.split('-').map(Number);
+  const dt = new Date(y, m - 1, d);
+  const days = ['일', '월', '화', '수', '목', '금', '토'];
+  if (short) return `${m}월 ${d}일 (${days[dt.getDay()]})`;
+  return `${m}월 ${d}일 ${days[dt.getDay()]}요일`;
+}
 
 // 전월 공식 종가 헬퍼 (인위적인 고정값·추측값 전면 배제, 오직 네이버 실시간 API 응답 데이터만 사용)
 const getStockPrevPrice = (st) => {
@@ -208,7 +229,7 @@ export default function App() {
     return saved;
   });
   const [tempRoomCode, setTempRoomCode] = useState(roomCode);
-  const [syncStatus, setSyncStatus] = useState('실시간 연동중');
+  const [syncStatus, setSyncStatus] = useState(`실시간 함께 쓰는 중 · ${roomCode}`);
 
   // --- 날짜 상태 (항상 오늘 날짜로 초기화되어 10/15 고정 문제 해결) ---
   const [currentYear, setCurrentYear] = useState(todayInfo.year);
@@ -237,6 +258,50 @@ export default function App() {
   // --- 기본 데이터 상태 (KKsweethome 실데이터와 100% 일치시켜 로딩 전/오프라인 시에도 실제 자산 표시) ---
   const [transactions, setTransactions] = useState([
     {
+      id: 1793800462176,
+      date: '2026-11-02',
+      type: '지출',
+      category: '쇼핑/생활',
+      amount: 22000,
+      owner: '공동',
+      memo: '주식회사놀유니버',
+      note: '',
+      isSpecial: false,
+    },
+    {
+      id: 1793800462177,
+      date: '2026-11-03',
+      type: '지출',
+      category: '교통/차량',
+      amount: 5900,
+      owner: '공동',
+      memo: '카카오T일반택시',
+      note: '',
+      isSpecial: false,
+    },
+    {
+      id: 1793800462178,
+      date: '2026-11-04',
+      type: '지출',
+      category: '쇼핑/생활',
+      amount: 25900,
+      owner: '공동',
+      memo: '씨제이올리브영',
+      note: '',
+      isSpecial: false,
+    },
+    {
+      id: 1793800462179,
+      date: '2026-11-04',
+      type: '지출',
+      category: '교통/차량',
+      amount: 12600,
+      owner: '공동',
+      memo: '카카오_택시_9',
+      note: '',
+      isSpecial: false,
+    },
+    {
       id: 1793424697079,
       date: '2026-10-29',
       type: '지출',
@@ -244,6 +309,7 @@ export default function App() {
       amount: 41700,
       owner: '공동',
       memo: '리미니 연수 스퀘어원',
+      note: '',
       isSpecial: false,
     },
     {
@@ -254,6 +320,7 @@ export default function App() {
       amount: 317200,
       owner: '공동',
       memo: '쿠첸',
+      note: '',
       isSpecial: false,
     },
     {
@@ -264,6 +331,7 @@ export default function App() {
       amount: 3900,
       owner: '남편',
       memo: '메가마트 스팟마트',
+      note: '',
       isSpecial: false,
     },
     {
@@ -274,6 +342,7 @@ export default function App() {
       amount: 550000,
       owner: '남편',
       memo: '월세',
+      note: '',
       isSpecial: false,
     },
     {
@@ -284,6 +353,7 @@ export default function App() {
       amount: 6400,
       owner: '아내',
       memo: '카카오T일반택시',
+      note: '',
       isSpecial: false,
     },
     {
@@ -294,6 +364,7 @@ export default function App() {
       amount: 10500,
       owner: '공동',
       memo: '아이스크림',
+      note: '',
       isSpecial: false,
     },
     {
@@ -304,6 +375,7 @@ export default function App() {
       amount: 77000,
       owner: '공동',
       memo: '딘타이펑',
+      note: '',
       isSpecial: false,
     },
     {
@@ -314,6 +386,7 @@ export default function App() {
       amount: 4200000,
       owner: '남편',
       memo: '월급',
+      note: '',
       isSpecial: false,
     },
   ]);
@@ -356,7 +429,7 @@ export default function App() {
 
   const [loans, setLoans] = useState([
     {
-      id: 1792782313049,
+      id: 1793830003166,
       name: '토스전세자금대출',
       amount: 320000000,
       rate: 4.46,
@@ -371,8 +444,8 @@ export default function App() {
       code: '360750',
       shares: 300,
       avgPrice: 16500,
-      currentPrice: 25605,
-      prevMonthPrice: 25825,
+      currentPrice: 25075,
+      prevMonthPrice: 25310,
       owner: '아내',
     },
     {
@@ -381,8 +454,8 @@ export default function App() {
       code: '000660',
       shares: 2,
       avgPrice: 1436000,
-      currentPrice: 1554000,
-      prevMonthPrice: 1783000,
+      currentPrice: 1420000,
+      prevMonthPrice: 1391000,
       owner: '남편',
     },
     {
@@ -391,8 +464,8 @@ export default function App() {
       code: '402970',
       shares: 2280,
       avgPrice: 12669,
-      currentPrice: 15175,
-      prevMonthPrice: 14425,
+      currentPrice: 15320,
+      prevMonthPrice: 15450,
       owner: '남편',
     },
   ]);
@@ -421,6 +494,7 @@ export default function App() {
   const [isBulkSmsModalOpen, setIsBulkSmsModalOpen] = useState(false);
   const [bulkSmsText, setBulkSmsText] = useState('');
   const [bulkImages, setBulkImages] = useState([]);
+  const [bulkOwner, setBulkOwner] = useState('공동');
   const [parsedBulkItems, setParsedBulkItems] = useState([]);
   const [isBulkSmsLoading, setIsBulkSmsLoading] = useState(false);
   const [customApiKey, setCustomApiKey] = useState(
@@ -473,6 +547,12 @@ export default function App() {
   const [selectedTrendIndex, setSelectedTrendIndex] = useState(5);
   const [isStockDetailOpen, setIsStockDetailOpen] = useState(false);
 
+  // 가계부 내역 검색 & 스마트 필터 상태
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchQuickTag, setSearchQuickTag] = useState('');
+  const [searchScope, setSearchScope] = useState('month'); // 'month' | 'all'
+  const [searchSort, setSearchSort] = useState('latest'); // 'latest' | 'amount'
+
   // --- Firebase 실시간 동기화 (방 문서가 있을 때만 안전하게 읽어오며 절대 초기값으로 덮어쓰지 않음) ---
   useEffect(() => {
     localStorage.setItem('roomCode', roomCode);
@@ -489,9 +569,9 @@ export default function App() {
           if (Array.isArray(data.stocks)) setStocks(data.stocks);
           if (typeof data.targetAsset === 'number') setTargetAsset(data.targetAsset);
           if (typeof data.monthlyBudget === 'number') setMonthlyBudget(data.monthlyBudget);
-          setSyncStatus(`실시간 연동중 (${roomCode})`);
+          setSyncStatus(`실시간 함께 쓰는 중 · ${roomCode}`);
         } else {
-          setSyncStatus(`연동 대기중 (${roomCode})`);
+          setSyncStatus(`연동 대기중 · ${roomCode}`);
         }
       },
       (error) => {
@@ -1047,6 +1127,7 @@ export default function App() {
         setIsTxModalOpen(false);
         setBulkImages([part]);
         setBulkSmsText('');
+        setBulkOwner(ownerFilter === '전체' ? '공동' : ownerFilter);
         setParsedBulkItems(formattedItems.filter((i) => Number(i.amount) > 0));
         setIsBulkSmsModalOpen(true);
       } else if (items.length === 1) {
@@ -1301,7 +1382,7 @@ ${bulkSmsText.trim()}
       type: item.type || '지출',
       category: item.category,
       amount: Number(item.amount),
-      owner: item.owner || '공동',
+      owner: bulkOwner || item.owner || '공동',
       memo: item.memo,
       note: item.note || '',
       isSpecial: false,
@@ -1328,6 +1409,83 @@ ${bulkSmsText.trim()}
       (t) => t.date.startsWith(monthPrefix) && matchOwner(t.owner)
     );
   }, [transactions, monthPrefix, ownerFilter]);
+
+  // --- 가계부 검색 & 추천 태그 필터링 계산 ---
+  const isSearching = Boolean(searchQuery.trim() || searchQuickTag);
+  const filteredSearchTxs = useMemo(() => {
+    if (!isSearching) return [];
+    const baseList =
+      searchScope === 'month'
+        ? monthlyTxs
+        : transactions.filter((t) => matchOwner(t.owner));
+
+    const qRaw = searchQuery.trim().toLowerCase();
+    const qNoSpace = qRaw.replace(/\s+/g, '');
+    const activeTagObj = QUICK_FILTER_TAGS.find((tg) => tg.id === searchQuickTag);
+
+    // 업종 및 동의어 키워드 사전 (예: "병원" 검색 시 병원 이름뿐만 아니라 '의료/건강' 카테고리도 자동 매칭)
+    const categorySynonyms = {
+      '외식/카페': ['외식', '카페', '식당', '커피', '음식점', '배달', '치킨', '술집', '고기', '맛집', '베이커리', '빵', '디저트'],
+      '식비': ['식비', '마트', '장보기', '편의점', '슈퍼', '이마트', '홈플러스', '농협', '반찬', '정육'],
+      '의료/건강': ['병원', '약국', '의원', '치과', '내과', '이비인후과', '피부과', '안과', '정형외과', '한의원', '클리닉', '진료', '처방', '의료', '건강', '헬스'],
+      '교통/차량': ['교통', '차량', '주유', '주유소', '기름', '택시', '버스', '지하철', '기차', 'srt', 'ktx', '하이패스', '통행료', '주차', '세차', '정비'],
+      '주거/통신': ['주거', '통신', '월세', '관리비', '도시가스', '가스비', '전기세', '수도세', '인터넷', '통신비', '핸드폰', '보험'],
+      '쇼핑/생활': ['쇼핑', '생활', '쿠팡', '네이버페이', '택배', '배송', '옷', '의류', '다이소', '올리브영', '백화점', '미용실', '헤어'],
+      '문화/여가': ['문화', '여가', '영화', '극장', '넷플릭스', '유튜브', '공연', '여행', '호텔', '숙소', '게임'],
+      '경조사/선물': ['경조사', '선물', '축의금', '부의금', '화환', '꽃'],
+    };
+
+    const matched = baseList.filter((t) => {
+      if (activeTagObj) {
+        if (activeTagObj.type === 'category' && t.category !== activeTagObj.value) {
+          return false;
+        }
+        if (activeTagObj.type === 'minAmount' && (t.type !== '지출' || t.amount < activeTagObj.value)) {
+          return false;
+        }
+      }
+      if (qRaw) {
+        const rawHay = `${t.memo || ''} ${t.category || ''} ${t.note || ''} ${t.owner || ''} ${t.amount || ''}`.toLowerCase();
+        const noSpaceHay = rawHay.replace(/\s+/g, '');
+
+        // 1) 가맹점명(메모), 카테고리, 특이사항, 명의, 금액에 검색어가 직접 포함된 경우 (공백 포함 및 공백 제거 둘 다 지원)
+        if (rawHay.includes(qRaw) || noSpaceHay.includes(qNoSpace)) {
+          return true;
+        }
+
+        // 2) 업종 키워드 매칭 (예: "병원" 검색 시 병원 이름에 '병원'이 없어도 '의료/건강' 카테고리면 100% 매칭)
+        const catSyns = categorySynonyms[t.category] || [];
+        if (catSyns.some((syn) => syn.includes(qRaw) || qRaw.includes(syn))) {
+          return true;
+        }
+
+        return false;
+      }
+      return true;
+    });
+
+    return [...matched].sort((a, b) => {
+      if (searchSort === 'amount') {
+        return b.amount - a.amount;
+      }
+      return b.date.localeCompare(a.date) || b.id - a.id;
+    });
+  }, [isSearching, searchScope, monthlyTxs, transactions, ownerFilter, searchQuery, searchQuickTag, searchSort]);
+
+  const searchSummary = useMemo(() => {
+    const expList = filteredSearchTxs.filter((t) => t.type === '지출');
+    const incList = filteredSearchTxs.filter((t) => t.type === '수입');
+    const totalExp = expList.reduce((acc, t) => acc + t.amount, 0);
+    const totalInc = incList.reduce((acc, t) => acc + t.amount, 0);
+    const avgExp = expList.length > 0 ? Math.round(totalExp / expList.length) : 0;
+    return {
+      count: filteredSearchTxs.length,
+      expCount: expList.length,
+      totalExp,
+      totalInc,
+      avgExp,
+    };
+  }, [filteredSearchTxs]);
 
   // --- 캘린더 계산 ---
   const daysInMonth = new Date(currentYear, currentMonth, 0).getDate();
@@ -1581,6 +1739,9 @@ ${bulkSmsText.trim()}
   };
 
   const handleDeleteTx = (id) => {
+    const target = transactions.find((t) => t.id === id);
+    const label = target ? `[${target.memo || target.category} - ${Number(target.amount).toLocaleString()}원]` : '이 내역';
+    if (!window.confirm(`${label}을(를) 정말 삭제하시겠습니까?`)) return;
     const updated = transactions.filter((t) => t.id !== id);
     setTransactions(updated);
     syncToCloud({ transactions: updated });
@@ -1607,6 +1768,9 @@ ${bulkSmsText.trim()}
   };
 
   const deleteAccount = (id) => {
+    const target = accounts.find((a) => a.id === id);
+    const label = target ? `[${target.bank} - ${target.name}]` : '이 통장 계좌';
+    if (!window.confirm(`${label} 항목을 정말 삭제하시겠습니까?`)) return;
     const updated = accounts.filter((a) => a.id !== id);
     setAccounts(updated);
     syncToCloud({ accounts: updated });
@@ -1631,6 +1795,9 @@ ${bulkSmsText.trim()}
   };
 
   const deleteLoan = (id) => {
+    const target = loans.find((l) => l.id === id);
+    const label = target ? `[${target.name} - ${Number(target.amount).toLocaleString()}원]` : '이 대출';
+    if (!window.confirm(`${label} 항목을 정말 삭제하시겠습니까?`)) return;
     const updated = loans.filter((l) => l.id !== id);
     setLoans(updated);
     syncToCloud({ loans: updated });
@@ -1654,6 +1821,9 @@ ${bulkSmsText.trim()}
   };
 
   const deleteRealEstate = (id) => {
+    const target = realEstates.find((r) => r.id === id);
+    const label = target ? `[${target.name}]` : '이 부동산/보증금';
+    if (!window.confirm(`${label} 항목을 정말 삭제하시겠습니까?`)) return;
     const updated = realEstates.filter((r) => r.id !== id);
     setRealEstates(updated);
     syncToCloud({ realEstates: updated });
@@ -1695,6 +1865,9 @@ ${bulkSmsText.trim()}
   };
 
   const deleteStock = (id) => {
+    const target = stocks.find((s) => s.id === id);
+    const label = target ? `[${target.name}]` : '이 주식 종목';
+    if (!window.confirm(`${label} 종목을 정말 삭제하시겠습니까?`)) return;
     const updated = stocks.filter((s) => s.id !== id);
     setStocks(updated);
     syncToCloud({ stocks: updated });
@@ -1782,25 +1955,231 @@ ${bulkSmsText.trim()}
 
       {/* 메인 컨테이너 */}
       <main className="max-w-lg mx-auto p-4 flex flex-col gap-4">
-        {/* ==================== 2. 캘린더 탭 ==================== */}
+        {/* ==================== 2. 가계부(캘린더) 탭 ==================== */}
         {activeTab === 'calendar' && (
           <div className="flex flex-col gap-4">
+            {/* 🔍 스마트 내역 검색 & 원터치 필터 바 */}
+            <div className="bg-white rounded-3xl p-4 shadow-[0_4px_20px_rgba(0,0,0,0.03)] border border-slate-100/80 flex flex-col gap-3">
+              <div className="relative flex items-center">
+                <Search
+                  size={16}
+                  className="absolute left-3.5 text-slate-400 pointer-events-none"
+                />
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="쿠팡, 병원, 택시, 메모 등 내역 검색..."
+                  className="w-full pl-9 pr-20 py-2.5 bg-slate-50 border border-slate-200/80 rounded-2xl text-xs font-bold text-slate-800 placeholder:font-medium placeholder:text-slate-400 focus:outline-none focus:bg-white focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/15 transition-all"
+                />
+                {(searchQuery || searchQuickTag) && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSearchQuery('');
+                      setSearchQuickTag('');
+                    }}
+                    className="absolute right-2.5 text-[11px] bg-slate-200/80 hover:bg-slate-300 text-slate-600 font-bold px-2 py-1 rounded-xl flex items-center gap-0.5 transition"
+                  >
+                    <X size={12} /> 초기화
+                  </button>
+                )}
+              </div>
+
+              {/* 원터치 추천 태그 칩 */}
+              <div className="flex items-center gap-1.5 overflow-x-auto pb-0.5 no-scrollbar">
+                {QUICK_FILTER_TAGS.map((tag) => {
+                  const active = searchQuickTag === tag.id;
+                  return (
+                    <button
+                      key={tag.id}
+                      type="button"
+                      onClick={() =>
+                        setSearchQuickTag(active ? '' : tag.id)
+                      }
+                      className={`shrink-0 text-[11px] px-2.5 py-1.5 rounded-full font-extrabold border transition-all ${
+                        active
+                          ? 'bg-emerald-600 text-white border-emerald-600 shadow-sm'
+                          : 'bg-slate-50 text-slate-600 border-slate-200/80 hover:bg-slate-100'
+                      }`}
+                    >
+                      {tag.label}
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* 검색 또는 태그 활성화 시: 범위/정렬 스위치 + 미니 통계 요약 카드 + 검색 결과 리스트 */}
+              {isSearching && (
+                <div className="pt-2 border-t border-slate-100 flex flex-col gap-3">
+                  {/* 검색 범위 (이번 달 vs 전체 기간) & 정렬 기준 (최신순 vs 금액 높은 순) */}
+                  <div className="flex justify-between items-center gap-2 flex-wrap">
+                    <div className="inline-flex bg-slate-100 p-0.5 rounded-xl text-[11px] font-bold">
+                      <button
+                        type="button"
+                        onClick={() => setSearchScope('month')}
+                        className={`px-2.5 py-1 rounded-lg transition-all ${
+                          searchScope === 'month'
+                            ? 'bg-white text-slate-900 shadow-sm font-black'
+                            : 'text-slate-500 hover:text-slate-800'
+                        }`}
+                      >
+                        {currentMonth}월 내역만
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setSearchScope('all')}
+                        className={`px-2.5 py-1 rounded-lg transition-all ${
+                          searchScope === 'all'
+                            ? 'bg-white text-slate-900 shadow-sm font-black'
+                            : 'text-slate-500 hover:text-slate-800'
+                        }`}
+                      >
+                        전체 기간
+                      </button>
+                    </div>
+
+                    <div className="inline-flex bg-slate-100 p-0.5 rounded-xl text-[11px] font-bold">
+                      <button
+                        type="button"
+                        onClick={() => setSearchSort('latest')}
+                        className={`px-2.5 py-1 rounded-lg transition-all ${
+                          searchSort === 'latest'
+                            ? 'bg-white text-slate-900 shadow-sm font-black'
+                            : 'text-slate-500 hover:text-slate-800'
+                        }`}
+                      >
+                        최신순
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setSearchSort('amount')}
+                        className={`px-2.5 py-1 rounded-lg transition-all ${
+                          searchSort === 'amount'
+                            ? 'bg-white text-slate-900 shadow-sm font-black'
+                            : 'text-slate-500 hover:text-slate-800'
+                        }`}
+                      >
+                        금액 높은 순
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* 검색 결과 상단 미니 통계 요약 배너 */}
+                  <div className="bg-gradient-to-r from-emerald-50/90 to-teal-50/70 border border-emerald-200/70 rounded-2xl p-3.5 flex justify-between items-center">
+                    <div className="flex flex-col gap-0.5">
+                      <span className="text-[11px] font-extrabold text-emerald-800">
+                        검색 결과 총 {searchSummary.count}건
+                        {searchScope === 'month' ? ` (${currentMonth}월)` : ' (전체 기간)'}
+                      </span>
+                      <span className="text-[11px] text-emerald-700/80 font-semibold">
+                        {searchSummary.expCount > 0
+                          ? `건당 평균 지출 ${searchSummary.avgExp.toLocaleString()}원`
+                          : '일치하는 지출 내역이 없어요'}
+                      </span>
+                    </div>
+                    <div className="text-right">
+                      <span className="text-[10px] font-bold text-slate-400 block">
+                        합계 금액
+                      </span>
+                      <span className="text-base font-black text-red-500">
+                        {searchSummary.totalExp > 0
+                          ? `-${searchSummary.totalExp.toLocaleString()}원`
+                          : searchSummary.totalInc > 0
+                          ? `+${searchSummary.totalInc.toLocaleString()}원`
+                          : '0원'}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* 검색된 내역 리스트 (그림 없이 깔끔하고 세련된 텍스트 UI) */}
+                  <div className="flex flex-col gap-2 max-h-80 overflow-y-auto pr-0.5">
+                    {filteredSearchTxs.length === 0 ? (
+                      <div className="text-center py-6 text-xs text-slate-400 font-medium">
+                        조건에 맞는 내역을 찾지 못했어요 🔍
+                      </div>
+                    ) : (
+                      filteredSearchTxs.map((t) => (
+                        <div
+                          key={t.id}
+                          onClick={() => {
+                            const [y, m] = t.date.split('-').map(Number);
+                            if (y && m) {
+                              setCurrentYear(y);
+                              setCurrentMonth(m);
+                            }
+                            setSelectedDate(t.date);
+                          }}
+                          className="flex justify-between items-center p-3.5 bg-slate-50/80 hover:bg-slate-100/80 rounded-2xl border border-slate-100 cursor-pointer transition"
+                        >
+                          <div className="flex flex-col gap-1 min-w-0">
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <span className="text-[10px] font-extrabold px-1.5 py-0.5 rounded bg-white border border-slate-200 text-slate-700">
+                                {t.owner}
+                              </span>
+                              <span className="text-xs font-extrabold text-slate-900 truncate">
+                                {t.memo || t.category}
+                              </span>
+                              {t.isSpecial && (
+                                <span className="text-[9px] bg-amber-50 text-amber-700 font-bold px-1.5 py-0.5 rounded">
+                                  용돈/특별
+                                </span>
+                              )}
+                            </div>
+                            <span className="text-[11px] text-slate-400 font-medium truncate">
+                              {formatFriendlyDate(t.date, true)} · {t.category}
+                              {t.note ? ` · ${t.note}` : ''}
+                            </span>
+                          </div>
+                          <div
+                            className="flex items-center gap-1.5 shrink-0"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <span
+                              className={`text-sm font-black ${
+                                t.type === '수입' ? 'text-emerald-600' : 'text-red-500'
+                              }`}
+                            >
+                              {t.type === '수입' ? '+' : '-'}
+                              {t.amount.toLocaleString()}원
+                            </span>
+                            <button
+                              onClick={() => openEditTxModal(t)}
+                              className="text-gray-400 hover:text-emerald-700 p-1"
+                            >
+                              <Edit2 size={14} />
+                            </button>
+                            <button
+                              onClick={() => handleDeleteTx(t.id)}
+                              className="text-gray-400 hover:text-red-500 p-1"
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+
             {/* 상단 타이틀 및 월 이동 바 */}
             <div className="bg-white rounded-3xl p-5 shadow-[0_4px_20px_rgba(0,0,0,0.03)] border border-slate-100/80 flex flex-col gap-3">
               <div className="flex justify-between items-end">
                 <div>
                   <span className="text-[11px] font-bold text-emerald-600 block">
-                    월간 흐름
+                    이번 달 소비 흐름
                   </span>
                   <div className="flex items-center gap-2">
-                    <h2 className="text-xl font-black text-slate-900">캘린더</h2>
+                    <h2 className="text-xl font-black text-slate-900">가계부 달력</h2>
                     <button
                       onClick={() => {
                         setCurrentYear(todayInfo.year);
                         setCurrentMonth(todayInfo.month);
                         setSelectedDate(todayInfo.dateStr);
                       }}
-                      className="text-[10px] bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full font-bold hover:bg-slate-200 transition"
+                      className="text-[10px] bg-slate-100 text-slate-600 px-2.5 py-0.5 rounded-full font-bold hover:bg-slate-200 transition"
                     >
                       오늘로 이동
                     </button>
@@ -1900,12 +2279,12 @@ ${bulkSmsText.trim()}
                       </div>
                       <div className="w-full flex flex-col items-center leading-tight">
                         {dayInc > 0 && (
-                          <span className="text-[9px] font-extrabold text-emerald-600 truncate max-w-full">
+                          <span className="text-[9px] tracking-tighter font-extrabold text-emerald-600 truncate max-w-full">
                             +{dayInc.toLocaleString()}
                           </span>
                         )}
                         {dayExp > 0 && (
-                          <span className="text-[9px] font-extrabold text-red-500 truncate max-w-full">
+                          <span className="text-[9px] tracking-tighter font-extrabold text-red-500 truncate max-w-full">
                             -{dayExp.toLocaleString()}
                           </span>
                         )}
@@ -1925,7 +2304,7 @@ ${bulkSmsText.trim()}
             <div className="grid grid-cols-2 gap-2.5">
               <div className="bg-white p-3.5 rounded-2xl shadow-sm border border-gray-100">
                 <span className="text-[11px] text-gray-400 font-bold block">
-                  이번 달 총수입
+                  이번 달 수입
                 </span>
                 <span className="text-base font-black text-emerald-600">
                   +{totalMonthIncome.toLocaleString()}원
@@ -1933,7 +2312,7 @@ ${bulkSmsText.trim()}
               </div>
               <div className="bg-white p-3.5 rounded-2xl shadow-sm border border-gray-100">
                 <span className="text-[11px] text-gray-400 font-bold block">
-                  이번 달 총지출
+                  이번 달 지출
                 </span>
                 <span className="text-base font-black text-red-500">
                   -{totalMonthExpense.toLocaleString()}원
@@ -1957,12 +2336,12 @@ ${bulkSmsText.trim()}
               </div>
             </div>
 
-            {/* 선택 날짜 상세 영수증 내역 */}
+            {/* 선택 날짜 상세 내역 */}
             <div className="bg-white rounded-3xl p-5 shadow-[0_4px_20px_rgba(0,0,0,0.03)] border border-slate-100/80 flex flex-col gap-3">
               <div className="flex justify-between items-center border-b border-slate-100 pb-2.5">
                 <div className="flex items-center gap-2">
                   <span className="text-sm font-black text-slate-900">
-                    🧾 {selectedDate} 내역
+                    {formatFriendlyDate(selectedDate)}
                   </span>
                   {HOLIDAYS[selectedDate] && (
                     <span className="text-[10px] bg-red-50 text-red-500 font-bold px-2 py-0.5 rounded-full">
@@ -1975,18 +2354,19 @@ ${bulkSmsText.trim()}
                     onClick={() => {
                       setBulkSmsText('');
                       setBulkImages([]);
+                      setBulkOwner(ownerFilter === '전체' ? '공동' : ownerFilter);
                       setParsedBulkItems([]);
                       setIsBulkSmsModalOpen(true);
                     }}
                     className="text-[11px] bg-slate-100 text-slate-700 px-3 py-1.5 rounded-xl font-bold hover:bg-slate-200 transition flex items-center gap-1"
                   >
-                    <Camera size={13} /> 캡처·문자 일괄입력
+                    <Camera size={13} /> 사진·문자 등록
                   </button>
                   <button
                     onClick={() => openAddTxModal(selectedDate)}
                     className="text-xs bg-slate-900 text-white px-3.5 py-1.5 rounded-xl font-bold hover:bg-slate-800 transition"
                   >
-                    + 내역 입력
+                    + 내역 추가
                   </button>
                 </div>
               </div>
@@ -1994,8 +2374,8 @@ ${bulkSmsText.trim()}
               <div className="flex flex-col gap-2">
                 {monthlyTxs.filter((t) => t.date === selectedDate).length ===
                 0 ? (
-                  <div className="text-center py-6 text-xs text-slate-400 font-medium">
-                    이 날짜에 기록된 영수증이 없습니다.
+                  <div className="text-center py-7 text-xs text-slate-400 font-medium">
+                    아직 기록된 소비 내역이 없어요 ☕
                   </div>
                 ) : (
                   monthlyTxs
@@ -2005,12 +2385,12 @@ ${bulkSmsText.trim()}
                         key={t.id}
                         className="flex justify-between items-center p-3.5 bg-slate-50/70 rounded-2xl border border-slate-100/80"
                       >
-                        <div className="flex flex-col gap-0.5">
-                          <div className="flex items-center gap-1.5">
-                            <span className="text-[10px] font-extrabold px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700">
+                        <div className="flex flex-col gap-1 min-w-0">
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span className="text-[10px] font-extrabold px-1.5 py-0.5 rounded bg-white border border-slate-200 text-slate-700">
                               {t.owner}
                             </span>
-                            <span className="text-xs font-extrabold text-slate-900">
+                            <span className="text-xs font-extrabold text-slate-900 truncate">
                               {t.memo || t.category}
                             </span>
                             {t.isSpecial && (
@@ -2019,12 +2399,12 @@ ${bulkSmsText.trim()}
                               </span>
                             )}
                           </div>
-                          <span className="text-[11px] text-gray-400 font-medium">
+                          <span className="text-[11px] text-gray-400 font-medium truncate">
                             {t.category}
                             {t.note ? ` · ${t.note}` : ''}
                           </span>
                         </div>
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-1.5 shrink-0">
                           <span
                             className={`text-sm font-black ${
                               t.type === '수입'
@@ -2676,11 +3056,11 @@ ${bulkSmsText.trim()}
               </div>
             </div>
 
-            {/* 부부 통장 쪼개기 잔액 현황 */}
+            {/* 우리 부부 통장 */}
             <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100 flex flex-col gap-3">
               <div className="flex justify-between items-center">
                 <span className="text-sm font-black text-gray-900">
-                  💳 부부 통장 쪼개기 잔액 현황
+                  💳 우리 부부 통장
                 </span>
                 <button
                   onClick={() => setAccountModal({ open: true, item: null })}
@@ -2732,11 +3112,11 @@ ${bulkSmsText.trim()}
               </div>
             </div>
 
-            {/* 부동산/보증금 & 대출 내역 */}
+            {/* 주거 자산 · 대출 */}
             <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100 flex flex-col gap-3">
               <div className="flex justify-between items-center">
                 <span className="text-sm font-black text-gray-900">
-                  🏢 부동산·보증금 및 대출 관리
+                  🏠 주거 자산 · 대출
                 </span>
                 <div className="flex gap-1.5">
                   <button
@@ -2944,8 +3324,7 @@ ${bulkSmsText.trim()}
               {stocks.length > 0 && (
                 <div className="mt-2 p-3.5 bg-slate-100 rounded-xl flex flex-col gap-2.5">
                   <span className="text-xs font-black text-emerald-700 flex items-center gap-1">
-                    <Calculator size={14} /> 주식·ETF 추가 매수(물타기/불타기)
-                    평단가 계산기
+                    <Calculator size={14} /> 🧮 추가 매수 평단가 계산기
                   </span>
                   <div className="grid grid-cols-3 gap-2 text-xs">
                     <select
@@ -3114,28 +3493,6 @@ ${bulkSmsText.trim()}
                 </div>
               ))}
             </div>
-
-            {/* AI 캡처 이미지/문자 분석용 Gemini API 키 설정 (로컬/브라우저 저장) */}
-            <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100 flex flex-col gap-2.5">
-              <span className="text-sm font-black text-gray-900">
-                🤖 AI 캡처·리포트용 Gemini API 키
-              </span>
-              <p className="text-xs text-gray-500">
-                Vercel 배포 환경변수가 없을 때(로컬 미리보기 등) 캡처 사진 자동 정리를 사용하려면 키를 입력해 주세요.
-              </p>
-              <div className="flex gap-2">
-                <input
-                  type="password"
-                  placeholder="AIzaSy... (비워두면 기본 환경변수 사용)"
-                  value={customApiKey}
-                  onChange={(e) => {
-                    setCustomApiKey(e.target.value);
-                    localStorage.setItem('userGeminiApiKey', e.target.value.trim());
-                  }}
-                  className="flex-1 border border-gray-200 rounded-xl px-3 py-2 text-xs font-bold bg-[#f8fbfa]"
-                />
-              </div>
-            </div>
           </div>
         )}
       </main>
@@ -3150,7 +3507,7 @@ ${bulkSmsText.trim()}
             }`}
           >
             <Home size={20} />
-            <span className="text-[10px]">홈(자산)</span>
+            <span className="text-[10px]">자산</span>
           </button>
           <button
             onClick={() => setActiveTab('calendar')}
@@ -3159,7 +3516,7 @@ ${bulkSmsText.trim()}
             }`}
           >
             <CalendarIcon size={20} />
-            <span className="text-[10px]">캘린더</span>
+            <span className="text-[10px]">가계부</span>
           </button>
 
           <div className="flex justify-center">
@@ -3178,7 +3535,7 @@ ${bulkSmsText.trim()}
             }`}
           >
             <PieChart size={20} />
-            <span className="text-[10px]">월간리포트</span>
+            <span className="text-[10px]">리포트</span>
           </button>
           <button
             onClick={() => setActiveTab('settings')}
@@ -3485,13 +3842,34 @@ ${bulkSmsText.trim()}
 
             {parsedBulkItems.length > 0 && (
               <div className="flex flex-col gap-2 pt-2 border-t border-gray-100">
-                <div className="flex justify-between items-center">
-                  <span className="font-extrabold text-gray-800">
-                    자동 정리된 리스트 ({parsedBulkItems.length}건)
-                  </span>
-                  <span className="text-[10px] text-slate-400 font-medium">
-                    내용·특이사항·카테고리 수정 가능
-                  </span>
+                <div className="flex justify-between items-center bg-slate-50 p-2.5 rounded-2xl border border-slate-200/80">
+                  <div className="flex flex-col">
+                    <span className="font-extrabold text-gray-800 text-xs">
+                      자동 정리된 내역 ({parsedBulkItems.length}건)
+                    </span>
+                    <span className="text-[10px] text-slate-400 font-medium">
+                      저장할 명의를 선택해 주세요.
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-[11px] font-bold text-slate-600">명의:</span>
+                    <div className="flex bg-white p-0.5 rounded-xl border border-slate-200">
+                      {['공동', '남편', '아내'].map((ow) => (
+                        <button
+                          type="button"
+                          key={ow}
+                          onClick={() => setBulkOwner(ow)}
+                          className={`px-2.5 py-1 rounded-lg text-xs font-extrabold transition-all ${
+                            bulkOwner === ow
+                              ? 'bg-slate-900 text-white shadow-sm'
+                              : 'text-slate-500 hover:text-slate-900'
+                          }`}
+                        >
+                          {ow}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
                 </div>
                 {parsedBulkItems.map((item, idx) => (
                   <div
